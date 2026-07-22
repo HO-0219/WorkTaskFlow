@@ -1,0 +1,19 @@
+{
+  "name": "Team Project",
+  "short_name": "TeamProject",
+  "description": "팀 일정과 업무를 함께 관리하는 협업 도구",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6fb",
+  "theme_color": "#5268d5",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
