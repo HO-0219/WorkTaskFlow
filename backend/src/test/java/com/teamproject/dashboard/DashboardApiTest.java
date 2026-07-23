@@ -81,6 +81,12 @@ class DashboardApiTest {
         mvc.perform(get("/api/v1/groups/{groupId}/dashboard", team.groupId())
                         .header("Authorization", bearer(team.memberToken())))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("DASHBOARD_FORBIDDEN"));
+        mvc.perform(get("/api/v1/groups/{groupId}/reports/me", team.groupId())
+                        .param("from", "2026-01-01").param("to", "2027-01-01")
+                        .header("Authorization", bearer(team.memberToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.memberId").value(team.memberId()))
+                .andExpect(jsonPath("$.tasks").isArray());
         mvc.perform(get("/api/v1/groups/{groupId}/dashboard", team.groupId())
                         .header("Authorization", bearer(team.ownerToken())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.visibility").value("LEADER_ONLY"));
@@ -96,7 +102,7 @@ class DashboardApiTest {
         Team team = team("personal");
         long personalGroupId = personalGroupId(team.memberToken());
         String todayDue = LocalDate.now().atTime(23, 59, 59).toString();
-        createTask(team.memberToken(), personalGroupId, "오늘 개인 업무", todayDue, "HIGH");
+        long personalTask = createTask(team.memberToken(), personalGroupId, "오늘 개인 업무", todayDue, "HIGH");
         long teamTask = createTask(team.memberToken(), team.groupId(), "진행 팀 업무", null, "URGENT");
         transition(team.ownerToken(), teamTask, "ACCEPT", 0, null);
         assign(team.ownerToken(), teamTask, team.memberId(), 1);
@@ -109,9 +115,9 @@ class DashboardApiTest {
                 .andExpect(jsonPath("$.delayedCount").value(0))
                 .andExpect(jsonPath("$.unreadNotificationCount").value(1))
                 .andExpect(jsonPath("$.priorityTasks.length()").value(2))
-                .andExpect(jsonPath("$.priorityTasks[0].id").value(teamTask))
+                .andExpect(jsonPath("$.priorityTasks[0].id").value(personalTask))
                 .andExpect(jsonPath("$.groups.length()").value(2))
-                .andExpect(jsonPath("$.recentNotifications[0].type").value("TASK_ASSIGNED"));
+                .andExpect(jsonPath("$.unreadNotifications[0].type").value("TASK_ASSIGNED"));
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.teamproject.notification.application.dto.NotificationDtos.Notificatio
 import com.teamproject.notification.application.dto.NotificationDtos.NotificationResponse;
 import com.teamproject.notification.application.dto.NotificationDtos.ReadAllResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -28,5 +29,11 @@ public class NotificationController {
     @PatchMapping("/read-all")
     ReadAllResponse readAll(Authentication authentication) {
         return notifications.readAll((Long) authentication.getPrincipal());
+    }
+
+    @DeleteMapping("/{notificationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(Authentication authentication, @PathVariable Long notificationId) {
+        notifications.delete((Long) authentication.getPrincipal(), notificationId);
     }
 }

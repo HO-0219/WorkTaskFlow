@@ -51,8 +51,8 @@ public class DashboardService {
         List<DashboardTaskResponse> priorityTasks = assigned.stream()
                 .filter(task -> !TERMINAL.contains(task.getStatus()))
                 .sorted(Comparator.comparingInt((Task task) -> delayed(task) ? 0 : 1)
-                        .thenComparing((Task task) -> priorityRank(task.getPriority()), Comparator.reverseOrder())
                         .thenComparing(Task::getDueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing((Task task) -> priorityRank(task.getPriority()), Comparator.reverseOrder())
                         .thenComparing(Task::getId)).limit(10).map(this::taskResponse).toList();
         List<PersonalGroupSummary> groupSummaries = assigned.stream()
                 .collect(Collectors.groupingBy(task -> task.getGroup().getId(), LinkedHashMap::new, Collectors.toList()))
@@ -65,7 +65,7 @@ public class DashboardService {
                 }).sorted(Comparator.comparing(PersonalGroupSummary::groupType)
                         .thenComparing(PersonalGroupSummary::groupName)).toList();
         LocalDate from = LocalDate.now();
-        var notificationPage = notifications.list(userId, null, 5);
+        var notificationPage = notifications.unread(userId, 5);
         return new PersonalDashboardResponse(now, todayDue, delayed, inProgress,
                 notificationPage.unreadCount(), priorityTasks, groupSummaries,
                 calendars.list(userId, null, from, from.plusDays(8)).items().stream().limit(10).toList(),
@@ -86,31 +86,33 @@ public class DashboardService {
         LocalDate periodTo = to == null ? today.plusDays(1) : to;
         validateRange(periodFrom, periodTo);
         List<Task> groupTasks = tasks.findAllByGroupIdOrderByCreatedAtDesc(groupId);
-        StatusCounts statuses = statuses(groupTasks);
+        LocalDateTime periodStart = periodFrom.atStartOfDay();
+        LocalDateTime periodEnd = periodTo.atStartOfDay();
+        List<Task> periodTasks = groupTasks.stream().filter(task -> occursInPeriod(task, periodStart, periodEnd)).toList();
+        StatusCounts statuses = statuses(groupTasks, periodTasks);
         List<Task> workflowTasks = groupTasks.stream()
+                .filter(task -> task.getStatus() == Task.Status.REQUESTED || periodTasks.contains(task))
                 .filter(task -> task.getStatus() != Task.Status.REJECTED && task.getStatus() != Task.Status.CANCELLED)
                 .toList();
         Integer progress = workflowTasks.isEmpty() ? null : percent(workflowTasks.stream()
                 .mapToLong(task -> progressWeight(task.getStatus())).sum(), workflowTasks.size() * 100L);
-        LocalDateTime periodStart = periodFrom.atStartOfDay();
-        LocalDateTime periodEnd = periodTo.atStartOfDay();
         List<Task> createdInPeriod = groupTasks.stream().filter(task -> !task.getCreatedAt().isBefore(periodStart)
                 && task.getCreatedAt().isBefore(periodEnd)).toList();
         long periodCompleted = createdInPeriod.stream().filter(task -> task.getStatus() == Task.Status.COMPLETED).count();
-        List<Task> completedWithDue = groupTasks.stream().filter(task -> task.getStatus() == Task.Status.COMPLETED
+        List<Task> completedWithDue = periodTasks.stream().filter(task -> task.getStatus() == Task.Status.COMPLETED
                 && task.getDueAt() != null && task.getCompletedAt() != null).toList();
         long onTime = completedWithDue.stream().filter(task -> !task.getCompletedAt().isAfter(task.getDueAt())).count();
-        List<Task> completed = groupTasks.stream().filter(task -> task.getStatus() == Task.Status.COMPLETED
+        List<Task> completed = periodTasks.stream().filter(task -> task.getStatus() == Task.Status.COMPLETED
                 && task.getCompletedAt() != null).toList();
         Long averageHours = completed.isEmpty() ? null : Math.round(completed.stream()
                 .mapToLong(task -> Duration.between(task.getCreatedAt(), task.getCompletedAt()).toMinutes())
                 .average().orElse(0) / 60.0);
-        Map<Long, List<Task>> byAssignee = groupTasks.stream().filter(task -> task.getAssignee() != null)
+        Map<Long, List<Task>> byAssignee = periodTasks.stream().filter(task -> task.getAssignee() != null)
                 .collect(Collectors.groupingBy(task -> task.getAssignee().getId()));
         List<MemberMetrics> memberMetrics = members.findAllByGroupIdAndStatusOrderByRoleAscJoinedAtAsc(
                 groupId, GroupMember.Status.ACTIVE).stream().map(member -> memberMetrics(member,
                         byAssignee.getOrDefault(member.getId(), List.of()))).toList();
-        List<DashboardTaskResponse> risks = groupTasks.stream()
+        List<DashboardTaskResponse> risks = periodTasks.stream()
                 .filter(task -> !TERMINAL.contains(task.getStatus()))
                 .filter(task -> delayed(task) || task.getPriority() == Task.Priority.HIGH
                         || task.getPriority() == Task.Priority.URGENT)
@@ -124,14 +126,33 @@ public class DashboardService {
                 createdInPeriod.isEmpty() ? null : percent(periodCompleted, createdInPeriod.size()),
                 completedWithDue.size(), onTime,
                 completedWithDue.isEmpty() ? null : percent(onTime, completedWithDue.size()),
-                averageHours, memberMetrics, risks);
+                averageHours, memberMetrics, risks, periodTasks.stream().map(this::taskResponse).toList(),
+                calendars.list(userId, groupId, periodFrom, periodTo).items());
     }
 
-    private StatusCounts statuses(List<Task> values) {
-        return new StatusCounts(count(values, Task.Status.REQUESTED), count(values, Task.Status.TODO),
-                count(values, Task.Status.IN_PROGRESS), count(values, Task.Status.ON_HOLD),
-                count(values, Task.Status.COMPLETED), count(values, Task.Status.REJECTED),
-                count(values, Task.Status.CANCELLED), values.stream().filter(this::delayed).count());
+    @Transactional(readOnly = true)
+    public MemberReportResponse memberReport(Long userId, Long groupId, LocalDate from, LocalDate to) {
+        GroupMember viewer = authorization.requireActiveMember(groupId, userId);
+        Group group = viewer.getGroup();
+        LocalDate today = LocalDate.now(zone(group));
+        LocalDate periodFrom = from == null ? today.minusDays(6) : from;
+        LocalDate periodTo = to == null ? today.plusDays(1) : to;
+        validateRange(periodFrom, periodTo);
+        LocalDateTime periodStart = periodFrom.atStartOfDay();
+        LocalDateTime periodEnd = periodTo.atStartOfDay();
+        List<DashboardTaskResponse> assigned = tasks.findAllByGroupIdOrderByCreatedAtDesc(groupId).stream()
+                .filter(task -> task.getAssignee() != null && task.getAssignee().getId().equals(viewer.getId()))
+                .filter(task -> occursInPeriod(task, periodStart, periodEnd))
+                .map(this::taskResponse).toList();
+        return new MemberReportResponse(groupId, group.getName(), viewer.getId(),
+                periodFrom, periodTo, assigned);
+    }
+
+    private StatusCounts statuses(List<Task> all, List<Task> period) {
+        return new StatusCounts(count(all, Task.Status.REQUESTED), count(period, Task.Status.TODO),
+                count(period, Task.Status.IN_PROGRESS), count(period, Task.Status.ON_HOLD),
+                count(period, Task.Status.COMPLETED), count(period, Task.Status.REJECTED),
+                count(period, Task.Status.CANCELLED), period.stream().filter(this::delayed).count());
     }
     private MemberMetrics memberMetrics(GroupMember member, List<Task> assigned) {
         List<Task> withDue = assigned.stream().filter(task -> task.getStatus() == Task.Status.COMPLETED
@@ -145,7 +166,18 @@ public class DashboardService {
     }
     private DashboardTaskResponse taskResponse(Task task) {
         return new DashboardTaskResponse(task.getId(), task.getGroup().getId(), task.getGroup().getName(),
-                task.getTitle(), task.getStatus().name(), task.getPriority().name(), task.getDueAt(), delayed(task));
+                task.getTitle(), task.getStatus().name(), task.getPriority().name(), task.getDueAt(), delayed(task),
+                task.getCreatedAt(), task.getStartAt(), task.getCompletedAt(),
+                task.getAssignee() == null ? null : task.getAssignee().getId(),
+                task.getAssignee() == null ? null : task.getAssignee().getUser().getNickname());
+    }
+    private boolean occursInPeriod(Task task, LocalDateTime from, LocalDateTime to) {
+        return inRange(task.getCreatedAt(), from, to) || inRange(task.getStartAt(), from, to)
+                || inRange(task.getDueAt(), from, to) || inRange(task.getCompletedAt(), from, to)
+                || inRange(task.getUpdatedAt(), from, to);
+    }
+    private boolean inRange(LocalDateTime value, LocalDateTime from, LocalDateTime to) {
+        return value != null && !value.isBefore(from) && value.isBefore(to);
     }
     private boolean delayed(Task task) {
         return task.isDelayed(LocalDateTime.now(zone(task.getGroup())));

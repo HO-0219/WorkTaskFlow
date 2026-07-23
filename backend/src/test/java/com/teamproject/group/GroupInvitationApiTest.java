@@ -131,6 +131,110 @@ class GroupInvitationApiTest {
                         .content("{\"email\":\"another@example.com\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("GROUP_LEADER_REQUIRED"));
+        mvc.perform(post("/api/v1/groups/{groupId}/invite-links", teamId)
+                        .header("Authorization", bearer(member)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GROUP_LEADER_REQUIRED"));
+    }
+
+    @Test
+    void sharedInviteLinkCanAddMultipleMembersAndBeRevoked() throws Exception {
+        Account owner = account("link_owner", "link-owner@example.com");
+        Account first = account("link_first", "link-first@example.com");
+        Account second = account("link_second", "link-second@example.com");
+        Account blocked = account("link_blocked", "link-blocked@example.com");
+        long teamId = team(owner.user(), "링크 초대 팀");
+
+        var created = mvc.perform(post("/api/v1/groups/{groupId}/invite-links", teamId)
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.url").isString())
+                .andReturn();
+        String url = com.jayway.jsonpath.JsonPath.read(
+                created.getResponse().getContentAsString(), "$.url");
+        String token = url.substring(url.indexOf("token=") + 6);
+        long linkId = ((Number) com.jayway.jsonpath.JsonPath.read(
+                created.getResponse().getContentAsString(), "$.id")).longValue();
+
+        mvc.perform(get("/api/v1/groups/{groupId}/invite-links", teamId)
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(linkId))
+                .andExpect(jsonPath("$[0].url").doesNotExist());
+
+        mvc.perform(post("/api/v1/group-invitations/{token}/accept", token)
+                        .header("Authorization", bearer(first)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("MEMBER"));
+        mvc.perform(post("/api/v1/group-invitations/{token}/accept", token)
+                        .header("Authorization", bearer(second)))
+                .andExpect(status().isOk());
+
+        mvc.perform(delete("/api/v1/groups/{groupId}/invite-links/{linkId}", teamId, linkId)
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/api/v1/group-invitations/{token}/accept", token)
+                        .header("Authorization", bearer(blocked)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVITATION_INVALID"));
+    }
+
+    @Test
+    void memberCanJoinWithGroupKeyAndKeyIsHiddenFromMembers() throws Exception {
+        Account owner = account("key_owner", "key-owner@example.com");
+        Account member = account("key_member", "key-member@example.com");
+        long teamId = team(owner.user(), "키 참여 팀");
+        String joinCode = groupService.get(owner.user().getId(), teamId).joinCode();
+
+        mvc.perform(post("/api/v1/groups/join")
+                        .header("Authorization", bearer(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + joinCode.toLowerCase() + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(teamId))
+                .andExpect(jsonPath("$.role").value("MEMBER"))
+                .andExpect(jsonPath("$.joinCode").doesNotExist());
+        mvc.perform(post("/api/v1/groups/join")
+                        .header("Authorization", bearer(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + joinCode + "\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_ALREADY_JOINED"));
+    }
+
+    @Test
+    void freeGroupReportIsLimitedToTwoPerWeekButPersonalReportIsUnlimited() throws Exception {
+        Account owner = account("report_owner", "report-owner@example.com");
+        Account member = account("report_member", "report-member@example.com");
+        long teamId = team(owner.user(), "무료 리포트 팀");
+        members.save(GroupMember.member(groups.findById(teamId).orElseThrow(), member.user()));
+        String groupReport = "{\"scope\":\"GROUP\",\"periodType\":\"WEEKLY\"}";
+
+        for (int index = 0; index < 2; index++) {
+            mvc.perform(post("/api/v1/groups/{groupId}/reports/access", teamId)
+                            .header("Authorization", bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON).content(groupReport))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.membershipPlan").value("FREE"))
+                    .andExpect(jsonPath("$.remainingThisWeek").value(1 - index));
+        }
+        mvc.perform(post("/api/v1/groups/{groupId}/reports/access", teamId)
+                        .header("Authorization", bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content(groupReport))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("FREE_REPORT_WEEKLY_LIMIT"));
+        mvc.perform(post("/api/v1/groups/{groupId}/reports/access", teamId)
+                        .header("Authorization", bearer(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scope\":\"MY\",\"periodType\":\"YEARLY\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.remainingThisWeek").doesNotExist());
+        mvc.perform(post("/api/v1/groups/{groupId}/reports/access", teamId)
+                        .header("Authorization", bearer(member))
+                        .contentType(MediaType.APPLICATION_JSON).content(groupReport))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GROUP_LEADER_REQUIRED"));
     }
 
     private Account account(String username, String email) {

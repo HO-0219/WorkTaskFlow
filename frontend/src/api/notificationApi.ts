@@ -10,6 +10,7 @@ export type NotificationResponse = {
   actorUserId?: number;
   actorNickname?: string;
   groupId?: number;
+  groupName?: string;
   taskId?: number;
   commentId?: number;
   read: boolean;
@@ -33,5 +34,8 @@ export const notificationApi = {
   }, true),
   readAll: () => request<{ updatedCount: number }>('/notifications/read-all', {
     method: 'PATCH',
+  }, true),
+  delete: (notificationId: number) => request<void>(`/notifications/${notificationId}`, {
+    method: 'DELETE',
   }, true),
 };

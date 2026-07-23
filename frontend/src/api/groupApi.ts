@@ -7,6 +7,8 @@ export type GroupResponse = {
   description?: string;
   timezone: string;
   dashboardVisibility: 'LEADER_ONLY' | 'MEMBERS';
+  membershipPlan: 'FREE' | 'PAID';
+  joinCode?: string;
   memberId: number;
   role: 'LEADER' | 'MEMBER';
   createdAt: string;
@@ -46,11 +48,36 @@ export type InvitationResponse = {
   createdAt: string;
 };
 
+export type InviteLinkResponse = {
+  id: number;
+  groupId: number;
+  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+  url?: string;
+  expiresAt: string;
+  usedCount: number;
+  createdAt: string;
+};
+
+export type ReportAccessResponse = {
+  allowed: boolean;
+  membershipPlan: 'FREE' | 'PAID';
+  scope: 'GROUP' | 'MY';
+  periodType: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  remainingThisWeek?: number;
+};
+
 export const groupApi = {
   list: () => request<GroupResponse[]>('/groups', {}, true),
   create: (body: CreateGroupRequest) => request<GroupResponse>('/groups', {
     method: 'POST', body: JSON.stringify(body),
   }, true),
+  join: (code: string) => request<GroupResponse>('/groups/join', {
+    method: 'POST', body: JSON.stringify({ code }),
+  }, true),
+  authorizeReport: (groupId: number, scope: 'GROUP' | 'MY', periodType: 'WEEKLY' | 'MONTHLY' | 'YEARLY') =>
+    request<ReportAccessResponse>(`/groups/${groupId}/reports/access`, {
+      method: 'POST', body: JSON.stringify({ scope, periodType }),
+    }, true),
   get: (groupId: number) => request<GroupResponse>(`/groups/${groupId}`, {}, true),
   update: (groupId: number, body: UpdateGroupRequest) => request<GroupResponse>(`/groups/${groupId}`, {
     method: 'PATCH', body: JSON.stringify(body),
@@ -59,6 +86,13 @@ export const groupApi = {
   invitations: (groupId: number) => request<InvitationResponse[]>(`/groups/${groupId}/invitations`, {}, true),
   invite: (groupId: number, email: string) => request<InvitationResponse>(`/groups/${groupId}/invitations`, {
     method: 'POST', body: JSON.stringify({ email }),
+  }, true),
+  createInviteLink: (groupId: number) => request<InviteLinkResponse>(`/groups/${groupId}/invite-links`, {
+    method: 'POST',
+  }, true),
+  inviteLinks: (groupId: number) => request<InviteLinkResponse[]>(`/groups/${groupId}/invite-links`, {}, true),
+  revokeInviteLink: (groupId: number, linkId: number) => request<void>(`/groups/${groupId}/invite-links/${linkId}`, {
+    method: 'DELETE',
   }, true),
   cancelInvitation: (groupId: number, invitationId: number) => request<void>(`/groups/${groupId}/invitations/${invitationId}`, {
     method: 'DELETE',

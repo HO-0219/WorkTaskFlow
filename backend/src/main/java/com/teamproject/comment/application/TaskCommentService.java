@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.LinkedHashSet;
-import java.util.ArrayList;
 import java.util.Set;
 
 @Service
@@ -55,9 +54,11 @@ public class TaskCommentService {
         GroupMember author = authorization.requireActiveMember(task.getGroup().getId(), userId);
         TaskComment comment = comments.save(new TaskComment(task, author, request.content().trim()));
         List<GroupMember> mentionedMembers = replaceMentions(comment, request.mentionedMemberIds());
-        List<GroupMember> recipients = new ArrayList<>(mentionedMembers);
-        if (task.getAssignee() != null) recipients.add(task.getAssignee());
-        notifications.commentCreated(comment, recipients);
+        if (!mentionedMembers.isEmpty()) notifications.commentMentioned(comment, mentionedMembers);
+        if (task.getAssignee() != null && mentionedMembers.stream()
+                .noneMatch(member -> member.getId().equals(task.getAssignee().getId()))) {
+            notifications.commentCreated(comment, List.of(task.getAssignee()));
+        }
         return response(comment);
     }
 

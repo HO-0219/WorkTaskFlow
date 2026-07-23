@@ -14,7 +14,9 @@ public final class DashboardDtos {
             long completed, long rejected, long cancelled, long delayed) {}
 
     public record DashboardTaskResponse(Long id, Long groupId, String groupName, String title,
-            String status, String priority, LocalDateTime dueAt, boolean delayed) {}
+            String status, String priority, LocalDateTime dueAt, boolean delayed,
+            LocalDateTime createdAt, LocalDateTime startAt, LocalDateTime completedAt,
+            Long assigneeMemberId, String assigneeNickname) {}
 
     public record PersonalGroupSummary(Long groupId, String groupName, String groupType,
             long assignedCount, long completedCount, long activeCount, long delayedCount) {}
@@ -22,7 +24,7 @@ public final class DashboardDtos {
     public record PersonalDashboardResponse(Instant generatedAt, long todayDueCount,
             long delayedCount, long inProgressCount, long unreadNotificationCount,
             List<DashboardTaskResponse> priorityTasks, List<PersonalGroupSummary> groups,
-            List<CalendarItemResponse> upcomingItems, List<NotificationResponse> recentNotifications) {}
+            List<CalendarItemResponse> upcomingItems, List<NotificationResponse> unreadNotifications) {}
 
     public record MemberMetrics(Long memberId, Long userId, String nickname, String role,
             long assignedCount, long activeCount, long completedCount, long delayedCount,
@@ -34,5 +36,9 @@ public final class DashboardDtos {
             long periodCreatedCount, long periodCompletedCount, Integer periodCompletionRatePercent,
             long completedWithDueDateCount, long onTimeCompletedCount, Integer onTimeRatePercent,
             Long averageCompletionHours, List<MemberMetrics> members,
-            List<DashboardTaskResponse> riskTasks) {}
+            List<DashboardTaskResponse> riskTasks, List<DashboardTaskResponse> periodTasks,
+            List<CalendarItemResponse> calendarItems) {}
+
+    public record MemberReportResponse(Long groupId, String groupName, Long memberId,
+            LocalDate periodFrom, LocalDate periodTo, List<DashboardTaskResponse> tasks) {}
 }

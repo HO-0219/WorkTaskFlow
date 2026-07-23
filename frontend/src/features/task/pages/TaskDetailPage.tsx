@@ -4,6 +4,7 @@ import { accessToken, errorMessage } from '../../../api/client';
 import { commentApi, CommentResponse } from '../../../api/commentApi';
 import { groupApi, GroupResponse, MemberResponse } from '../../../api/groupApi';
 import { ChecklistItemResponse, ChecklistResponse, taskApi, TaskAction, TaskHistoryResponse, TaskResponse } from '../../../api/taskApi';
+import { AppNavigation, Modal } from '../../../app/AppNavigation';
 
 const statusLabels: Record<TaskResponse['status'], string> = {
   REQUESTED: '승인 대기', TODO: '할 일', IN_PROGRESS: '진행 중', ON_HOLD: '보류',
@@ -39,6 +40,8 @@ export function TaskDetailPage() {
   const [editDueAt, setEditDueAt] = useState('');
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+  const [reasonAction, setReasonAction] = useState<TaskAction>();
+  const [actionReason, setActionReason] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -65,19 +68,23 @@ export function TaskDetailPage() {
 
   async function transition(action: TaskAction) {
     if (!task) return;
-    let reason: string | undefined;
     if (action === 'REJECT' || action === 'HOLD' || action === 'CANCEL') {
-      const entered = window.prompt(`${actionLabels[action]} 사유를 입력해 주세요.`);
-      if (entered === null) return;
-      reason = entered.trim();
-      if (!reason) { setError('상태 변경 사유를 입력해 주세요.'); return; }
+      setReasonAction(action); setActionReason(''); return;
     }
+    await performTransition(action);
+  }
+
+  async function performTransition(action: TaskAction, reason?: string) {
+    if (!task) return;
+    if (reasonAction && !reason?.trim()) { setError('상태 변경 사유를 입력해 주세요.'); return; }
     setPending(true);
     setError('');
     try {
-      const updated = await taskApi.transition(task.id, action, task.version, reason);
+      const updated = await taskApi.transition(task.id, action, task.version, reason?.trim());
       setTask(updated);
       setHistories(await taskApi.histories(task.id));
+      setReasonAction(undefined); setActionReason('');
+      window.dispatchEvent(new Event('notifications:refresh'));
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -92,6 +99,7 @@ export function TaskDetailPage() {
     try {
       const updated = await taskApi.assign(task.id, Number(assigneeMemberId), task.version);
       setTask(updated);
+      window.dispatchEvent(new Event('notifications:refresh'));
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -252,11 +260,12 @@ export function TaskDetailPage() {
 
   if (!accessToken.get()) return <Navigate to={`/login?next=${encodeURIComponent(`/tasks/${taskId}`)}`} replace />;
   if (loading) return <main className="center-page">업무를 불러오는 중...</main>;
-  return <main className="center-page"><section className="auth-card profile-card task-detail-card">
+  return <><AppNavigation /><main className="task-detail-page app-page"><section className="auth-card profile-card task-detail-card">
     <Link to={task ? `/groups/${task.groupId}/tasks` : '/groups'}>← 업무 목록으로</Link>
     {error && <p className="error task-detail-error">{error}</p>}
     {task && <>
       <div className="task-detail-heading"><div className="task-item-top"><span className={`task-status status-${task.status.toLowerCase()}`}>{statusLabels[task.status]}</span><span className={`task-priority priority-${task.priority.toLowerCase()}`}>{priorityLabels[task.priority]}</span>{task.delayed && <span className="task-delayed">지연</span>}</div><h1>{task.title}</h1></div>
+      <TaskWorkflow status={task.status} />
       <p className="task-description">{task.description || '등록된 설명이 없습니다.'}</p>
       {canEdit(task, group) && <section className="task-edit-section">{editing ? <form className="form task-edit-form" onSubmit={update}>
         <label className="field"><span>제목</span><input required maxLength={120} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
@@ -265,9 +274,9 @@ export function TaskDetailPage() {
         <div className="task-edit-actions"><button className="primary" disabled={pending}>수정 저장</button><button className="secondary" type="button" disabled={pending} onClick={() => { syncEditFields(task); setEditing(false); }}>취소</button></div>
       </form> : <button className="secondary" type="button" disabled={pending} onClick={() => setEditing(true)}>업무 내용 수정</button>}</section>}
       <dl className="task-metadata">
-        <div><dt>요청 멤버</dt><dd>#{task.requesterMemberId}</dd></div>
-        <div><dt>담당 멤버</dt><dd>{task.assigneeMemberId ? `#${task.assigneeMemberId}` : '미지정'}</dd></div>
-        <div><dt>승인 멤버</dt><dd>{task.approverMemberId ? `#${task.approverMemberId}` : '미지정'}</dd></div>
+        <div><dt>요청자</dt><dd>{memberName(members, task.requesterMemberId)}</dd></div>
+        <div><dt>담당자</dt><dd>{task.assigneeMemberId ? memberName(members, task.assigneeMemberId) : '미지정'}</dd></div>
+        <div><dt>승인자</dt><dd>{task.approverMemberId ? memberName(members, task.approverMemberId) : '미지정'}</dd></div>
         <div><dt>마감일</dt><dd>{task.dueAt ? formatDate(task.dueAt) : '없음'}</dd></div>
         <div><dt>등록일</dt><dd>{formatDate(task.createdAt)}</dd></div>
         {task.startAt && <div><dt>시작일</dt><dd>{formatDate(task.startAt)}</dd></div>}
@@ -275,6 +284,9 @@ export function TaskDetailPage() {
         {task.holdReason && <div><dt>보류 사유</dt><dd>{task.holdReason}</dd></div>}
         {task.stopReason && <div><dt>종료 사유</dt><dd>{task.stopReason}</dd></div>}
       </dl>
+      <div className="task-next-actions"><TaskActions task={task} group={group} pending={pending} onAction={transition} />
+        {group?.role === 'LEADER' && task.status !== 'REQUESTED' && !isTerminal(task.status) && <section className="task-action-section"><h2>다음 단계 · 담당자 지정</h2><div className="task-assignee-form"><select value={assigneeMemberId} onChange={(event) => setAssigneeMemberId(event.target.value)}><option value="">담당자 선택</option>{members.map((member) => <option value={member.id} key={member.id}>{member.nickname} · {member.role === 'LEADER' ? '팀장' : '팀원'}</option>)}</select><button className="secondary" type="button" disabled={pending || !assigneeMemberId} onClick={assign}>담당자 저장</button></div></section>}
+      </div>
       <ChecklistSection
         checklist={checklist}
         writable={canWriteChecklist(task, group)}
@@ -306,12 +318,20 @@ export function TaskDetailPage() {
         onCancelEdit={() => setEditingCommentId(undefined)}
         onDelete={deleteComment}
       />
-      {group?.role === 'LEADER' && !isTerminal(task.status) && <section className="task-action-section"><h2>담당자 지정</h2><div className="task-assignee-form"><select value={assigneeMemberId} onChange={(event) => setAssigneeMemberId(event.target.value)}><option value="">담당자 선택</option>{members.map((member) => <option value={member.id} key={member.id}>{member.nickname} · {member.role === 'LEADER' ? '팀장' : '팀원'}</option>)}</select><button className="secondary" type="button" disabled={pending || !assigneeMemberId} onClick={assign}>담당자 저장</button></div></section>}
-      <TaskActions task={task} group={group} pending={pending} onAction={transition} />
       <section className="task-action-section"><h2>상태 이력</h2><div className="task-history-list">{histories.map((history) => <div className="task-history-item" key={history.id}><span className="task-history-dot" /><div><strong>{history.fromStatus ? `${statusLabels[history.fromStatus]} → ` : ''}{statusLabels[history.toStatus]}</strong><small>멤버 #{history.changedByMemberId} · {formatDate(history.createdAt)}</small>{history.reason && <p>{history.reason}</p>}</div></div>)}</div></section>
     </>}
-  </section></main>;
+  </section>{reasonAction && <Modal title={actionLabels[reasonAction]} description="업무 이력에 남을 사유를 입력해 주세요." onClose={() => { setReasonAction(undefined); setActionReason(''); setError(''); }}><form className="form modal-form" onSubmit={(event) => { event.preventDefault(); void performTransition(reasonAction, actionReason); }}><label className="field"><span>사유</span><textarea autoFocus required maxLength={500} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="팀원이 이해할 수 있도록 간단히 적어주세요." /></label>{error && <p className="error">{error}</p>}<div className="modal-actions"><button className="secondary" type="button" onClick={() => setReasonAction(undefined)}>돌아가기</button><button className="danger" disabled={pending || !actionReason.trim()}>{pending ? '처리 중...' : actionLabels[reasonAction]}</button></div></form></Modal>}</main></>;
 }
+
+function TaskWorkflow({ status }: { status: TaskResponse['status'] }) {
+  const steps: TaskResponse['status'][] = ['REQUESTED', 'TODO', 'IN_PROGRESS', 'COMPLETED'];
+  const effective = status === 'ON_HOLD' ? 'IN_PROGRESS' : status;
+  const activeIndex = steps.indexOf(effective);
+  if (status === 'REJECTED' || status === 'CANCELLED') return <div className="task-workflow stopped"><span>요청</span><span>업무가 {statusLabels[status]}되었습니다</span></div>;
+  return <div className="task-workflow">{steps.map((step, index) => <div className={index < activeIndex ? 'done' : index === activeIndex ? 'active' : ''} key={step}><i>{index < activeIndex ? '✓' : index + 1}</i><span>{step === 'REQUESTED' ? '승인 대기' : status === 'ON_HOLD' && step === 'IN_PROGRESS' ? '보류 중' : statusLabels[step]}</span></div>)}</div>;
+}
+
+function memberName(members: MemberResponse[], memberId: number) { return members.find((member) => member.id === memberId)?.nickname ?? `멤버 #${memberId}`; }
 
 function CommentSection({ comments, members, currentMemberId, pending, newContent, newMentionIds,
   editingCommentId, editContent, editMentionIds, onNewContent, onNewMentionIds, onAdd,

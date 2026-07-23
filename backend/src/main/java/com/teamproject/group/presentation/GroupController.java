@@ -3,13 +3,18 @@ package com.teamproject.group.presentation;
 import com.teamproject.group.application.GroupService;
 import com.teamproject.group.application.GroupInvitationService;
 import com.teamproject.group.application.GroupMemberService;
+import com.teamproject.group.application.GroupReportService;
 import com.teamproject.group.application.dto.GroupDtos.CreateGroupRequest;
 import com.teamproject.group.application.dto.GroupDtos.GroupResponse;
 import com.teamproject.group.application.dto.GroupDtos.UpdateGroupRequest;
 import com.teamproject.group.application.dto.GroupDtos.CreateInvitationRequest;
 import com.teamproject.group.application.dto.GroupDtos.InvitationResponse;
+import com.teamproject.group.application.dto.GroupDtos.InviteLinkResponse;
 import com.teamproject.group.application.dto.GroupDtos.MemberResponse;
 import com.teamproject.group.application.dto.GroupDtos.ChangeMemberRoleRequest;
+import com.teamproject.group.application.dto.GroupDtos.JoinGroupRequest;
+import com.teamproject.group.application.dto.GroupDtos.ReportAccessRequest;
+import com.teamproject.group.application.dto.GroupDtos.ReportAccessResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -22,11 +27,14 @@ public class GroupController {
     private final GroupService groups;
     private final GroupInvitationService invitations;
     private final GroupMemberService members;
+    private final GroupReportService reports;
 
-    public GroupController(GroupService groups, GroupInvitationService invitations, GroupMemberService members) {
+    public GroupController(GroupService groups, GroupInvitationService invitations, GroupMemberService members,
+            GroupReportService reports) {
         this.groups = groups;
         this.invitations = invitations;
         this.members = members;
+        this.reports = reports;
     }
 
     @GetMapping
@@ -38,6 +46,18 @@ public class GroupController {
     @ResponseStatus(HttpStatus.CREATED)
     GroupResponse create(Authentication authentication, @Valid @RequestBody CreateGroupRequest request) {
         return groups.createTeam((Long) authentication.getPrincipal(), request);
+    }
+
+    @PostMapping("/join")
+    GroupResponse join(Authentication authentication, @Valid @RequestBody JoinGroupRequest request) {
+        return groups.join((Long) authentication.getPrincipal(), request.code());
+    }
+
+    @PostMapping("/{groupId}/reports/access")
+    ReportAccessResponse reportAccess(Authentication authentication, @PathVariable Long groupId,
+            @Valid @RequestBody ReportAccessRequest request) {
+        return reports.authorize((Long) authentication.getPrincipal(), groupId,
+                request.scope(), request.periodType());
     }
 
     @GetMapping("/{groupId}")
@@ -66,6 +86,24 @@ public class GroupController {
     @GetMapping("/{groupId}/invitations")
     List<InvitationResponse> invitations(Authentication authentication, @PathVariable Long groupId) {
         return invitations.list((Long) authentication.getPrincipal(), groupId);
+    }
+
+    @PostMapping("/{groupId}/invite-links")
+    @ResponseStatus(HttpStatus.CREATED)
+    InviteLinkResponse createInviteLink(Authentication authentication, @PathVariable Long groupId) {
+        return invitations.createLink((Long) authentication.getPrincipal(), groupId);
+    }
+
+    @GetMapping("/{groupId}/invite-links")
+    List<InviteLinkResponse> inviteLinks(Authentication authentication, @PathVariable Long groupId) {
+        return invitations.listLinks((Long) authentication.getPrincipal(), groupId);
+    }
+
+    @DeleteMapping("/{groupId}/invite-links/{linkId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void revokeInviteLink(Authentication authentication, @PathVariable Long groupId,
+            @PathVariable Long linkId) {
+        invitations.revokeLink((Long) authentication.getPrincipal(), groupId, linkId);
     }
 
     @DeleteMapping("/{groupId}/invitations/{invitationId}")

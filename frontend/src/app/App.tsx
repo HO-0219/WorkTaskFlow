@@ -16,9 +16,11 @@ import { NotificationsPage } from '../features/notification/pages/NotificationsP
 import { CalendarPage } from '../features/calendar/pages/CalendarPage';
 import { GroupDashboardPage } from '../features/dashboard/pages/GroupDashboardPage';
 import { PwaStatus } from './PwaStatus';
+import { LanguageProvider } from './LanguageContext';
+import { useLanguage } from './LanguageContext';
 
 export default function App() {
-  return <BrowserRouter>
+  return <LanguageProvider><BrowserRouter>
     <a className="skip-link" href="#main-content">본문으로 건너뛰기</a>
     <RouteAnnouncer />
     <div id="main-content" tabIndex={-1}><Routes>
@@ -42,12 +44,13 @@ export default function App() {
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes></div>
     <PwaStatus />
-  </BrowserRouter>;
+  </BrowserRouter></LanguageProvider>;
 }
 
 function RouteAnnouncer() {
+  const { language } = useLanguage();
   const location = useLocation();
-  const label = pageLabel(location.pathname);
+  const label = pageLabel(location.pathname, language);
   useEffect(() => {
     document.title = `${label} | Team Project`;
     window.requestAnimationFrame(() => document.getElementById('main-content')?.focus());
@@ -55,7 +58,12 @@ function RouteAnnouncer() {
   return <span className="sr-only" role="status" aria-live="polite">{label} 페이지</span>;
 }
 
-function pageLabel(pathname: string) {
+function pageLabel(pathname: string, language: 'ko' | 'en') {
+  if (language === 'en') {
+    if (pathname === '/') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts';
+    if (pathname === '/groups') return 'Groups'; if (pathname === '/profile') return 'Profile'; if (pathname === '/account') return 'Account settings';
+    if (/\/dashboard$/.test(pathname)) return 'Group dashboard'; if (/\/tasks$/.test(pathname)) return 'Tasks'; if (/^\/tasks\//.test(pathname)) return 'Task details';
+  }
   if (pathname === '/') return '내 대시보드';
   if (pathname === '/calendar') return '캘린더';
   if (pathname === '/notifications') return '알림';

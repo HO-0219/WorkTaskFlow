@@ -37,7 +37,8 @@ public final class CalendarDtos {
             String groupType, String timezone, String type, String title, String description,
             LocalDateTime startAt, LocalDateTime endAt, Instant startAtUtc, Instant endAtUtc,
             boolean allDay, String location, Long createdByMemberId, Long version,
-            LocalDateTime createdAt, LocalDateTime updatedAt) {}
+            LocalDateTime createdAt, LocalDateTime updatedAt,
+            Long ownerMemberId, String ownerNickname) {}
 
     public record CalendarResponse(List<CalendarItemResponse> items, String from, String to) {}
 }

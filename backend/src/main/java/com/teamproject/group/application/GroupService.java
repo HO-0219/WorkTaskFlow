@@ -15,10 +15,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.DateTimeException;
 import java.time.ZoneId;
+import java.security.SecureRandom;
 import java.util.List;
 
 @Service
 public class GroupService {
+    private static final char[] JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
+    private final SecureRandom random = new SecureRandom();
     private final UserRepository users;
     private final GroupRepository groups;
     private final GroupMemberRepository members;
@@ -45,8 +48,30 @@ public class GroupService {
         String timezone = normalizeTimezone(request.timezone());
         String description = request.description() == null || request.description().isBlank()
                 ? null : request.description().trim();
-        Group group = groups.save(Group.team(request.name().trim(), description, timezone, creator));
+        Group group = groups.save(Group.team(request.name().trim(), description, timezone, newJoinCode(), creator));
         return response(members.save(GroupMember.leader(group, creator)));
+    }
+
+    @Transactional
+    public GroupResponse join(Long userId, String rawCode) {
+        String code = rawCode == null ? "" : rawCode.replaceAll("\\s+", "").toUpperCase();
+        Group group = groups.findByJoinCodeIgnoreCase(code).orElseThrow(() ->
+                new ApplicationException("GROUP_JOIN_CODE_INVALID", HttpStatus.NOT_FOUND,
+                        "그룹 키를 확인해 주세요."));
+        if (group.getType() != Group.Type.TEAM) {
+            throw new ApplicationException("GROUP_JOIN_CODE_INVALID", HttpStatus.NOT_FOUND,
+                    "그룹 키를 확인해 주세요.");
+        }
+        User user = users.findById(userId).orElseThrow(() ->
+                new ApplicationException("USER_NOT_FOUND", HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        GroupMember membership = members.findByGroupIdAndUserId(group.getId(), userId).orElse(null);
+        if (membership != null && membership.getStatus() == GroupMember.Status.ACTIVE) {
+            throw new ApplicationException("GROUP_ALREADY_JOINED", HttpStatus.CONFLICT,
+                    "이미 참여 중인 그룹입니다.");
+        }
+        if (membership == null) membership = GroupMember.member(group, user);
+        else membership.reactivateAsMember();
+        return response(members.save(membership));
     }
 
     @Transactional(readOnly = true)
@@ -94,6 +119,18 @@ public class GroupService {
 
     private String blankToNull(String value) { return value.isBlank() ? null : value.trim(); }
 
+    private String newJoinCode() {
+        String code;
+        do {
+            StringBuilder value = new StringBuilder(8);
+            for (int index = 0; index < 8; index++) {
+                value.append(JOIN_CODE_ALPHABET[random.nextInt(JOIN_CODE_ALPHABET.length)]);
+            }
+            code = value.toString();
+        } while (groups.existsByJoinCode(code));
+        return code;
+    }
+
     private Group.DashboardVisibility visibility(String value) {
         try {
             return Group.DashboardVisibility.valueOf(value.trim().toUpperCase());
@@ -106,7 +143,8 @@ public class GroupService {
     private GroupResponse response(GroupMember member) {
         Group group = member.getGroup();
         return new GroupResponse(group.getId(), group.getType().name(), group.getName(), group.getDescription(),
-                group.getTimezone(), group.getDashboardVisibility().name(), member.getId(),
+                group.getTimezone(), group.getDashboardVisibility().name(), group.getMembershipPlan().name(),
+                member.getRole() == GroupMember.Role.LEADER ? group.getJoinCode() : null, member.getId(),
                 member.getRole().name(), group.getCreatedAt(), group.getUpdatedAt());
     }
 }

@@ -4,6 +4,7 @@ import com.teamproject.authentication.infrastructure.crypto.HashService;
 import com.teamproject.authentication.infrastructure.mail.MailService;
 import com.teamproject.common.exception.ApplicationException;
 import com.teamproject.group.application.dto.GroupDtos.InvitationResponse;
+import com.teamproject.group.application.dto.GroupDtos.InviteLinkResponse;
 import com.teamproject.group.application.dto.GroupDtos.MemberResponse;
 import com.teamproject.group.domain.*;
 import com.teamproject.user.domain.User;
@@ -23,6 +24,7 @@ public class GroupInvitationService {
     private final SecureRandom random = new SecureRandom();
     private final GroupAuthorization authorization;
     private final GroupInvitationRepository invitations;
+    private final GroupInviteLinkRepository inviteLinks;
     private final GroupMemberRepository members;
     private final UserRepository users;
     private final HashService hashes;
@@ -31,11 +33,13 @@ public class GroupInvitationService {
     private final long invitationHours;
 
     public GroupInvitationService(GroupAuthorization authorization, GroupInvitationRepository invitations,
-            GroupMemberRepository members, UserRepository users, HashService hashes, MailService mail,
+            GroupInviteLinkRepository inviteLinks, GroupMemberRepository members,
+            UserRepository users, HashService hashes, MailService mail,
             @Value("${app.frontend-url}") String frontendUrl,
             @Value("${app.group.invitation-hours}") long invitationHours) {
         this.authorization = authorization;
         this.invitations = invitations;
+        this.inviteLinks = inviteLinks;
         this.members = members;
         this.users = users;
         this.hashes = hashes;
@@ -46,11 +50,7 @@ public class GroupInvitationService {
 
     @Transactional
     public InvitationResponse invite(Long userId, Long groupId, String rawEmail) {
-        GroupMember inviter = authorization.requireLeader(groupId, userId);
-        if (inviter.getGroup().getType() != Group.Type.TEAM) {
-            throw new ApplicationException("PERSONAL_GROUP_RESTRICTED", HttpStatus.BAD_REQUEST,
-                    "개인 그룹에는 멤버를 초대할 수 없습니다.");
-        }
+        GroupMember inviter = requireTeamLeader(groupId, userId);
         String email = normalizeEmail(rawEmail);
         users.findByEmailIgnoreCase(email).ifPresent(user -> {
             if (members.findByGroupIdAndUserIdAndStatus(groupId, user.getId(), GroupMember.Status.ACTIVE).isPresent()) {
@@ -74,6 +74,46 @@ public class GroupInvitationService {
         mail.sendBestEffort(email, "[Team Project] 그룹 초대", inviter.getGroup().getName()
                 + " 그룹에 초대되었습니다.\n" + link + "\n" + invitationHours + "시간 안에 수락해 주세요.");
         return response(invitation);
+    }
+
+    @Transactional
+    public InviteLinkResponse createLink(Long userId, Long groupId) {
+        GroupMember inviter = requireTeamLeader(groupId, userId);
+        LocalDateTime now = LocalDateTime.now();
+        inviteLinks.findAllByGroupIdAndStatusOrderByCreatedAtDesc(
+                groupId, GroupInviteLink.Status.ACTIVE).forEach(existing -> {
+                    if (existing.isActiveAt(now)) existing.revoke();
+                    else existing.expire();
+                });
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(random.generateSeed(32));
+        GroupInviteLink inviteLink = inviteLinks.save(new GroupInviteLink(inviter.getGroup(), inviter,
+                hashes.sha256(token), now.plusHours(invitationHours)));
+        return response(inviteLink, frontendUrl + "/group-invitations/accept?token=" + token);
+    }
+
+    @Transactional
+    public List<InviteLinkResponse> listLinks(Long userId, Long groupId) {
+        requireTeamLeader(groupId, userId);
+        LocalDateTime now = LocalDateTime.now();
+        return inviteLinks.findAllByGroupIdAndStatusOrderByCreatedAtDesc(
+                groupId, GroupInviteLink.Status.ACTIVE).stream()
+                .peek(value -> { if (!value.isActiveAt(now)) value.expire(); })
+                .filter(value -> value.getStatus() == GroupInviteLink.Status.ACTIVE)
+                .map(value -> response(value, null))
+                .toList();
+    }
+
+    @Transactional
+    public void revokeLink(Long userId, Long groupId, Long linkId) {
+        requireTeamLeader(groupId, userId);
+        GroupInviteLink inviteLink = inviteLinks.findByIdAndGroupId(linkId, groupId)
+                .orElseThrow(() -> new ApplicationException("INVITE_LINK_NOT_FOUND", HttpStatus.NOT_FOUND,
+                        "초대 링크를 찾을 수 없습니다."));
+        if (!inviteLink.isActiveAt(LocalDateTime.now())) {
+            throw new ApplicationException("INVITE_LINK_NOT_ACTIVE", HttpStatus.BAD_REQUEST,
+                    "사용 중인 초대 링크만 해제할 수 있습니다.");
+        }
+        inviteLink.revoke();
     }
 
     @Transactional
@@ -103,24 +143,37 @@ public class GroupInvitationService {
         User user = users.findById(userId).orElseThrow(() ->
                 new ApplicationException("USER_NOT_FOUND", HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
         String tokenHash = hashes.sha256(token);
-        GroupInvitation invitation = invitations.findByTokenHash(tokenHash)
-                .filter(value -> value.isUsable(tokenHash, LocalDateTime.now()))
-                .orElseThrow(() -> new ApplicationException("INVITATION_INVALID", HttpStatus.BAD_REQUEST,
-                        "초대가 올바르지 않거나 만료되었습니다."));
-        if (!invitation.getEmail().equalsIgnoreCase(user.getEmail())) {
-            throw new ApplicationException("INVITATION_EMAIL_MISMATCH", HttpStatus.FORBIDDEN,
-                    "초대받은 이메일 계정으로 로그인해 주세요.");
+        LocalDateTime now = LocalDateTime.now();
+        var emailInvitation = invitations.findByTokenHash(tokenHash);
+        if (emailInvitation.isPresent()) {
+            GroupInvitation invitation = emailInvitation.get();
+            if (!invitation.isUsable(tokenHash, now)) throw invalidInvitation();
+            if (!invitation.getEmail().equalsIgnoreCase(user.getEmail())) {
+                throw new ApplicationException("INVITATION_EMAIL_MISMATCH", HttpStatus.FORBIDDEN,
+                        "초대받은 이메일 계정으로 로그인해 주세요.");
+            }
+            GroupMember member = join(invitation.getGroup(), user);
+            invitation.accept(now);
+            return response(member);
         }
-        Long groupId = invitation.getGroup().getId();
+        GroupInviteLink inviteLink = inviteLinks.findByTokenHash(tokenHash)
+                .orElseThrow(this::invalidInvitation);
+        if (!inviteLink.isUsable(tokenHash, now)) throw invalidInvitation();
+        GroupMember member = join(inviteLink.getGroup(), user);
+        inviteLink.use();
+        return response(member);
+    }
+
+    private GroupMember join(Group group, User user) {
+        Long groupId = group.getId();
+        Long userId = user.getId();
         if (members.findByGroupIdAndUserIdAndStatus(groupId, userId, GroupMember.Status.ACTIVE).isPresent()) {
             throw new ApplicationException("GROUP_MEMBER_EXISTS", HttpStatus.CONFLICT,
                     "이미 그룹에 참여 중인 사용자입니다.");
         }
-        GroupMember member = members.findByGroupIdAndUserId(groupId, userId)
+        return members.findByGroupIdAndUserId(groupId, userId)
                 .map(existing -> { existing.reactivateAsMember(); return existing; })
-                .orElseGet(() -> members.save(GroupMember.member(invitation.getGroup(), user)));
-        invitation.accept(LocalDateTime.now());
-        return response(member);
+                .orElseGet(() -> members.save(GroupMember.member(group, user)));
     }
 
     @Transactional(readOnly = true)
@@ -131,9 +184,25 @@ public class GroupInvitationService {
     }
 
     private String normalizeEmail(String email) { return email.trim().toLowerCase(Locale.ROOT); }
+    private GroupMember requireTeamLeader(Long groupId, Long userId) {
+        GroupMember inviter = authorization.requireLeader(groupId, userId);
+        if (inviter.getGroup().getType() != Group.Type.TEAM) {
+            throw new ApplicationException("PERSONAL_GROUP_RESTRICTED", HttpStatus.BAD_REQUEST,
+                    "개인 그룹에는 멤버를 초대할 수 없습니다.");
+        }
+        return inviter;
+    }
+    private ApplicationException invalidInvitation() {
+        return new ApplicationException("INVITATION_INVALID", HttpStatus.BAD_REQUEST,
+                "초대가 올바르지 않거나 만료되었습니다.");
+    }
     private InvitationResponse response(GroupInvitation value) {
         return new InvitationResponse(value.getId(), value.getGroup().getId(), value.getEmail(),
                 value.getStatus().name(), value.getExpiresAt(), value.getAcceptedAt(), value.getCreatedAt());
+    }
+    private InviteLinkResponse response(GroupInviteLink value, String url) {
+        return new InviteLinkResponse(value.getId(), value.getGroup().getId(), value.getStatus().name(),
+                url, value.getExpiresAt(), value.getUsedCount(), value.getCreatedAt());
     }
     private MemberResponse response(GroupMember value) {
         return new MemberResponse(value.getId(), value.getUser().getId(), value.getUser().getNickname(),

@@ -114,17 +114,20 @@ public class CalendarService {
                 event.getDescription(), toLocal(event.getStartAtUtc(), zone), toLocal(event.getEndAtUtc(), zone),
                 toInstant(event.getStartAtUtc()), toInstant(event.getEndAtUtc()), event.isAllDay(),
                 event.getLocation(), event.getCreatedBy().getId(), event.getVersion(),
-                event.getCreatedAt(), event.getUpdatedAt());
+                event.getCreatedAt(), event.getUpdatedAt(),
+                event.getCreatedBy().getId(), event.getCreatedBy().getUser().getNickname());
     }
 
     private CalendarItemResponse taskResponse(Task task) {
         Group group = task.getGroup();
         ZoneId zone = zone(group);
         Instant dueUtc = task.getDueAt().atZone(zone).toInstant();
+        GroupMember owner = task.getAssignee() == null ? task.getRequester() : task.getAssignee();
         return new CalendarItemResponse("TASK_DEADLINE", null, task.getId(), group.getId(), group.getName(),
                 group.getType().name(), group.getTimezone(), "DEADLINE", task.getTitle(), task.getDescription(),
                 task.getDueAt(), task.getDueAt(), dueUtc, dueUtc, false, null,
-                task.getRequester().getId(), task.getVersion(), task.getCreatedAt(), task.getUpdatedAt());
+                task.getRequester().getId(), task.getVersion(), task.getCreatedAt(), task.getUpdatedAt(),
+                owner.getId(), owner.getUser().getNickname());
     }
 
     private GroupMember requireEditor(Long groupId, Long userId) {

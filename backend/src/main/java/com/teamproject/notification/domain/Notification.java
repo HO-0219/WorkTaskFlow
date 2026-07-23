@@ -69,5 +69,8 @@ public class Notification {
     public LocalDateTime getReadAt() { return readAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 
-    public enum Type { TASK_REQUESTED, TASK_ASSIGNED, TASK_STATUS_CHANGED, COMMENT_CREATED, COMMENT_MENTIONED }
+    public enum Type {
+        TASK_REQUESTED, TASK_ASSIGNED, TASK_STATUS_CHANGED, TASK_DUE_SOON,
+        COMMENT_CREATED, COMMENT_MENTIONED
+    }
 }

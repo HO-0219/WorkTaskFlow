@@ -48,7 +48,7 @@ class GroupApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("PERSONAL"))
                 .andExpect(jsonPath("$[0].role").value("LEADER"))
-                .andExpect(jsonPath("$[0].name").value("그룹 사용자의 개인 공간"));
+                .andExpect(jsonPath("$[0].name").value("그룹 사용자의 개인 일정"));
     }
 
     @Test

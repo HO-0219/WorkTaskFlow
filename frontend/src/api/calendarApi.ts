@@ -22,6 +22,8 @@ export type CalendarItem = {
   version: number;
   createdAt: string;
   updatedAt: string;
+  ownerMemberId?: number;
+  ownerNickname?: string;
 };
 
 export type CalendarEventBody = {

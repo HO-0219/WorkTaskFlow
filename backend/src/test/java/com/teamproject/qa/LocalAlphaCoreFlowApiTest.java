@@ -173,12 +173,12 @@ class LocalAlphaCoreFlowApiTest {
                 .andExpect(jsonPath("$.groups[0].groupId").value(groupId))
                 .andExpect(jsonPath("$.groups[0].completedCount").value(1))
                 .andExpect(jsonPath("$.unreadNotificationCount").value(1))
-                .andExpect(jsonPath("$.recentNotifications[0].type").value("TASK_ASSIGNED"));
+                .andExpect(jsonPath("$.unreadNotifications[0].type").value("TASK_ASSIGNED"));
         mvc.perform(get("/api/v1/notifications").header("Authorization", bearer(owner.token())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.unreadCount").value(3))
                 .andExpect(jsonPath("$.items[0].type").value("TASK_STATUS_CHANGED"))
-                .andExpect(jsonPath("$.items[1].type").value("COMMENT_CREATED"));
+                .andExpect(jsonPath("$.items[1].type").value("COMMENT_MENTIONED"));
     }
 
     private org.springframework.test.web.servlet.ResultActions transition(

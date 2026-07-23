@@ -10,6 +10,7 @@ import com.teamproject.authentication.application.token.OneTimeTokenService;
 import com.teamproject.group.domain.GroupMember;
 import com.teamproject.group.domain.GroupMemberRepository;
 import com.teamproject.group.domain.GroupRepository;
+import com.teamproject.notification.application.TaskReminderScheduler;
 import com.teamproject.user.domain.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +37,23 @@ class NotificationApiTest {
     @Autowired UserRepository users;
     @Autowired GroupRepository groups;
     @Autowired GroupMemberRepository members;
+    @Autowired TaskReminderScheduler reminders;
+
+    @Test
+    void soleLeaderReceivesOwnApprovalAndSelfAssignmentNotifications() throws Exception {
+        Fixture fixture = fixture("self_flow");
+        long taskId = createTask(fixture.ownerToken(), fixture.groupId(), "혼자 관리하는 업무");
+        transition(fixture.ownerToken(), taskId, "ACCEPT", 0);
+        assign(fixture.ownerToken(), taskId, fixture.ownerMemberId(), 1);
+
+        mvc.perform(get("/api/v1/notifications")
+                        .header("Authorization", bearer(fixture.ownerToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].type").value("TASK_ASSIGNED"))
+                .andExpect(jsonPath("$.items[1].type").value("TASK_REQUESTED"))
+                .andExpect(jsonPath("$.unreadCount").value(2));
+    }
 
     @Test
     void taskRequestCreatesLeaderNotificationAndReadEndpointsAreConsistent() throws Exception {
@@ -66,6 +86,12 @@ class NotificationApiTest {
         mvc.perform(get("/api/v1/notifications")
                         .header("Authorization", bearer(fixture.ownerToken())))
                 .andExpect(jsonPath("$.unreadCount").value(0));
+        mvc.perform(delete("/api/v1/notifications/{id}", notificationId)
+                        .header("Authorization", bearer(fixture.ownerToken())))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/notifications")
+                        .header("Authorization", bearer(fixture.ownerToken())))
+                .andExpect(jsonPath("$.items.length()").value(0));
     }
 
     @Test
@@ -86,7 +112,7 @@ class NotificationApiTest {
                         .header("Authorization", bearer(fixture.memberToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
-                .andExpect(jsonPath("$.items[0].type").value("COMMENT_CREATED"))
+                .andExpect(jsonPath("$.items[0].type").value("COMMENT_MENTIONED"))
                 .andExpect(jsonPath("$.items[1].type").value("TASK_ASSIGNED"))
                 .andExpect(jsonPath("$.unreadCount").value(2));
         mvc.perform(get("/api/v1/notifications")
@@ -193,6 +219,44 @@ class NotificationApiTest {
                 .andExpect(jsonPath("$.items[2].taskId").value(completedTask));
     }
 
+    @Test
+    void holdAndResumeNotifyGroupLeader() throws Exception {
+        Fixture fixture = fixture("hold_resume");
+        long taskId = createTask(fixture.memberToken(), fixture.groupId(), "상태 공유 업무");
+        transition(fixture.ownerToken(), taskId, "ACCEPT", 0);
+        assign(fixture.ownerToken(), taskId, fixture.memberId(), 1);
+        transition(fixture.memberToken(), taskId, "START", 2);
+        transitionWithReason(fixture.memberToken(), taskId, "HOLD", 3, "외부 확인 대기");
+        transition(fixture.memberToken(), taskId, "RESUME", 4);
+
+        mvc.perform(get("/api/v1/notifications")
+                        .header("Authorization", bearer(fixture.ownerToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(3))
+                .andExpect(jsonPath("$.items[0].message").value("'상태 공유 업무' 업무가 재개 상태가 되었습니다."))
+                .andExpect(jsonPath("$.items[1].message").value("'상태 공유 업무' 업무가 보류 상태가 되었습니다."));
+    }
+
+    @Test
+    void dueSoonSchedulerNotifiesAssigneeOnlyOnce() throws Exception {
+        Fixture fixture = fixture("due_soon");
+        long taskId = createTask(fixture.memberToken(), fixture.groupId(), "곧 마감 업무",
+                LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusHours(2).withNano(0).toString());
+        transition(fixture.ownerToken(), taskId, "ACCEPT", 0);
+        assign(fixture.ownerToken(), taskId, fixture.memberId(), 1);
+
+        reminders.sendDueSoonNotifications();
+        reminders.sendDueSoonNotifications();
+
+        mvc.perform(get("/api/v1/notifications")
+                        .header("Authorization", bearer(fixture.memberToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].type").value("TASK_DUE_SOON"))
+                .andExpect(jsonPath("$.items[0].title").value("중요 마감일 임박"))
+                .andExpect(jsonPath("$.items[1].type").value("TASK_ASSIGNED"));
+    }
+
     private Fixture fixture(String suffix) throws Exception {
         String ownerUsername = "notification_owner_" + suffix;
         String ownerToken = signupAndLogin(ownerUsername, ownerUsername + "@example.com");
@@ -201,10 +265,11 @@ class NotificationApiTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"알림 " + suffix + "\"}"))
                 .andExpect(status().isCreated()).andReturn();
         long groupId = ((Number) JsonPath.read(groupResult.getResponse().getContentAsString(), "$.id")).longValue();
+        long ownerMemberId = ((Number) JsonPath.read(groupResult.getResponse().getContentAsString(), "$.memberId")).longValue();
         String memberUsername = "notification_member_" + suffix;
         String memberToken = signupAndLogin(memberUsername, memberUsername + "@example.com");
         GroupMember member = addMember(groupId, memberUsername);
-        return new Fixture(ownerToken, memberToken, groupId, member.getId());
+        return new Fixture(ownerToken, memberToken, groupId, ownerMemberId, member.getId());
     }
 
     private GroupMember addMember(long groupId, String username) {
@@ -213,9 +278,14 @@ class NotificationApiTest {
     }
 
     private long createTask(String token, long groupId, String title) throws Exception {
+        return createTask(token, groupId, title, null);
+    }
+
+    private long createTask(String token, long groupId, String title, String dueAt) throws Exception {
+        String due = dueAt == null ? "" : ",\"dueAt\":\"" + dueAt + "\"";
         var result = mvc.perform(post("/api/v1/groups/{groupId}/tasks", groupId)
                         .header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"" + title + "\"}"))
+                        .content("{\"title\":\"" + title + "\"" + due + "}"))
                 .andExpect(status().isCreated()).andReturn();
         return ((Number) JsonPath.read(result.getResponse().getContentAsString(), "$.id")).longValue();
     }
@@ -257,5 +327,5 @@ class NotificationApiTest {
     }
 
     private String bearer(String token) { return "Bearer " + token; }
-    private record Fixture(String ownerToken, String memberToken, long groupId, long memberId) {}
+    private record Fixture(String ownerToken, String memberToken, long groupId, long ownerMemberId, long memberId) {}
 }

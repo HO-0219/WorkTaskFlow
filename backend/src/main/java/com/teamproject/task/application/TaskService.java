@@ -108,7 +108,7 @@ public class TaskService {
         }
         tasks.flush();
         histories.save(new TaskStatusHistory(task, from, task.getStatus(), actor, reason));
-        notifications.taskStatusChanged(task, actor);
+        notifications.taskStatusChanged(task, actor, from);
         return response(task);
     }
 

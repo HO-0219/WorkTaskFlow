@@ -11,8 +11,10 @@ import java.util.Optional;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     Slice<Notification> findByRecipientIdOrderByIdDesc(Long recipientId, Pageable pageable);
     Slice<Notification> findByRecipientIdAndIdLessThanOrderByIdDesc(Long recipientId, Long id, Pageable pageable);
+    Slice<Notification> findByRecipientIdAndReadAtIsNullOrderByIdDesc(Long recipientId, Pageable pageable);
     Optional<Notification> findByIdAndRecipientId(Long id, Long recipientId);
     long countByRecipientIdAndReadAtIsNull(Long recipientId);
+    boolean existsByRecipientIdAndEventKey(Long recipientId, String eventKey);
 
     @Modifying(clearAutomatically = true)
     @Query("update Notification n set n.readAt = :readAt where n.recipient.id = :recipientId and n.readAt is null")
