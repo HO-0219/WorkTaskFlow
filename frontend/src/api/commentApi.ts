@@ -7,6 +7,7 @@ export type CommentResponse = {
   authorNickname: string;
   content: string;
   deleted: boolean;
+  recordLocked: boolean;
   mentions: Array<{ id: number; memberId: number; userId: number; nickname: string }>;
   version: number;
   createdAt: string;

@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
@@ -69,6 +70,29 @@ public class GroupController {
     GroupResponse update(Authentication authentication, @PathVariable Long groupId,
             @Valid @RequestBody UpdateGroupRequest request) {
         return groups.update((Long) authentication.getPrincipal(), groupId, request);
+    }
+
+    @PostMapping("/{groupId}/image")
+    GroupResponse uploadImage(Authentication authentication, @PathVariable Long groupId,
+            @RequestPart("file") MultipartFile file) {
+        return groups.uploadImage((Long) authentication.getPrincipal(), groupId, file);
+    }
+
+    @PostMapping("/{groupId}/join-code")
+    @ResponseStatus(HttpStatus.CREATED)
+    GroupResponse createJoinCode(Authentication authentication, @PathVariable Long groupId) {
+        return groups.createJoinCode((Long) authentication.getPrincipal(), groupId);
+    }
+
+    @PutMapping("/{groupId}/join-code")
+    GroupResponse rotateJoinCode(Authentication authentication, @PathVariable Long groupId) {
+        return groups.rotateJoinCode((Long) authentication.getPrincipal(), groupId);
+    }
+
+    @DeleteMapping("/{groupId}/join-code")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void revokeJoinCode(Authentication authentication, @PathVariable Long groupId) {
+        groups.revokeJoinCode((Long) authentication.getPrincipal(), groupId);
     }
 
     @GetMapping("/{groupId}/members")

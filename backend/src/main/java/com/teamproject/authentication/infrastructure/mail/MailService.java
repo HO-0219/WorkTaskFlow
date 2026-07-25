@@ -19,7 +19,8 @@ public class MailService {
     }
     public void sendBestEffort(String to, String subject, String body) {
         if (!enabled) {
-            log.info("[LOCAL MAIL] to={} subject={} body={}", to, subject, body);
+            log.info("[LOCAL MAIL] recipient={} subject={} bodyLength={} (content redacted)",
+                    maskRecipient(to), subject, body == null ? 0 : body.length());
             return;
         }
         var message = new SimpleMailMessage();

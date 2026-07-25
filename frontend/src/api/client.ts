@@ -4,7 +4,7 @@ export type ApiError = { code?: string; message?: string; fieldErrors?: Record<s
 
 export async function request<T>(path: string, init: RequestInit = {}, authenticated = false): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body) headers.set('Content-Type', 'application/json');
+  if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (authenticated) {
     const token = accessToken.get();
     if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -17,12 +17,12 @@ export async function request<T>(path: string, init: RequestInit = {}, authentic
     throw {
       code: offline ? 'OFFLINE' : 'NETWORK_ERROR',
       message: offline
-        ? '오프라인에서는 조회하거나 변경할 수 없습니다. 연결 후 다시 시도해 주세요.'
-        : '서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        ? localeText('오프라인에서는 조회하거나 변경할 수 없습니다. 연결 후 다시 시도해 주세요.', 'You are offline. Reconnect and try again.')
+        : localeText('서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'Could not connect to the server. Try again shortly.'),
     } satisfies ApiError;
   }
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: '요청 처리 중 오류가 발생했습니다.' }));
+    const error = await response.json().catch(() => ({ message: localeText('요청 처리 중 오류가 발생했습니다.', 'An error occurred while processing the request.') }));
     throw error as ApiError;
   }
   return response.status === 204 ? (undefined as T) : response.json();
@@ -38,7 +38,18 @@ export const accessToken = {
   clear: () => localStorage.removeItem('accessToken'),
 };
 
+export const sessionMode = {
+  isDemo: () => localStorage.getItem('sessionMode') === 'demo',
+  setDemo: () => localStorage.setItem('sessionMode', 'demo'),
+  clear: () => localStorage.removeItem('sessionMode'),
+};
+
 export function errorMessage(error: unknown) {
   const value = error as ApiError;
-  return value?.message ?? '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  if (localStorage.getItem('language') === 'en' && value?.message && /[가-힣]/.test(value.message)) {
+    return 'The request could not be completed. Check your input or try again.';
+  }
+  return value?.message ?? localeText('요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'The request could not be completed. Try again shortly.');
 }
+
+function localeText(ko: string, en: string) { return localStorage.getItem('language') === 'en' ? en : ko; }

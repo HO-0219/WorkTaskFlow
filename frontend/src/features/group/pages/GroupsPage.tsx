@@ -67,34 +67,34 @@ export function GroupsPage() {
     <section className="groups-layout groups-layout-single">
       <div className="group-list-card">
         <div className="section-title-row"><div><h2>{t('참여 중인 그룹', 'Your groups')}</h2><p>{t(`${groups.filter((group) => group.type === 'TEAM').length}개의 그룹`, `${groups.filter((group) => group.type === 'TEAM').length} groups`)}</p></div></div>
-        {loading && <p className="muted">그룹을 불러오는 중...</p>}
-        {!loading && groups.filter((group) => group.type === 'TEAM').length === 0 && <p className="empty-state">참여 중인 그룹이 없습니다.</p>}
+        {loading && <p className="muted">{t('그룹을 불러오는 중...', 'Loading groups...')}</p>}
+        {!loading && groups.filter((group) => group.type === 'TEAM').length === 0 && <p className="empty-state">{t('참여 중인 그룹이 없습니다.', 'You have not joined any groups yet.')}</p>}
         <div className="group-list group-card-grid">{groups.filter((group) => group.type === 'TEAM').map((group, index) => <article className="group-item group-card" key={group.id}>
           <Link className="group-link group-dashboard-link" to={`/groups/${group.id}/dashboard`}><span className={`group-avatar group-avatar-${index % 4}`} aria-hidden="true">{group.name.slice(0, 1)}</span>
-            <div><span className="group-type team">{group.membershipPlan === 'PAID' ? '유료 그룹' : '무료 그룹'}</span><strong>{group.name}</strong></div>
-            <p>{group.description || '설명 없음'}</p><small>{group.role === 'LEADER' ? '팀장' : '팀원'}</small>
-          </Link><Link className="group-settings-button" to={`/groups/${group.id}`} aria-label={`${group.name} 설정`}>⚙</Link>
+            <div><span className="group-type team">{group.membershipPlan === 'PAID' ? t('유료 그룹', 'Paid group') : t('무료 그룹', 'Free group')}</span><strong>{group.name}</strong></div>
+            <p>{group.description || t('설명 없음', 'No description')}</p><small>{group.role === 'LEADER' ? t('팀장', 'Leader') : t('팀원', 'Member')}</small>
+          </Link><Link className="group-settings-button" to={`/groups/${group.id}`} aria-label={t(`${group.name} 설정`, `${group.name} settings`)}>⚙</Link>
         </article>)}</div>
       </div>
     </section>
-    {showCreate && <Modal title="새 그룹 만들기" description="새로운 팀 공간을 만들고 함께할 사람들을 초대해 보세요." onClose={() => setShowCreate(false)}><form className="form modal-form" onSubmit={create}>
-        <label className="field"><span>팀 이름</span><input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 졸업 프로젝트팀" /></label>
-        <label className="field"><span>설명 (선택)</span><input maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="팀의 목적을 입력하세요" /></label>
-        <label className="field"><span>시간대</span><select value={timezone} onChange={(event) => setTimezone(event.target.value)}>{timezoneOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+    {showCreate && <Modal title={t('새 그룹 만들기', 'Create a group')} description={t('새로운 팀 공간을 만들고 함께할 사람들을 초대해 보세요.', 'Create a team space and invite people to join.')} onClose={() => setShowCreate(false)}><form className="form modal-form" onSubmit={create}>
+        <label className="field"><span>{t('팀 이름', 'Team name')}</span><input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder={t('예: 졸업 프로젝트팀', 'e.g. Graduation project team')} /></label>
+        <label className="field"><span>{t('설명 (선택)', 'Description (optional)')}</span><input maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t('팀의 목적을 입력하세요', 'Describe the purpose of this team')} /></label>
+        <label className="field"><span>{t('시간대', 'Time zone')}</span><select value={timezone} onChange={(event) => setTimezone(event.target.value)}>{timezoneOptions.map((option) => <option value={option.value} key={option.value}>{t(option.label, option.en)}</option>)}</select></label>
         {error && <p className="error">{error}</p>}
-        <div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowCreate(false)}>취소</button><button className="primary" disabled={saving}>{saving ? '생성 중...' : '그룹 만들기'}</button></div>
+        <div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowCreate(false)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving}>{saving ? t('생성 중...', 'Creating...') : t('그룹 만들기', 'Create group')}</button></div>
       </form></Modal>}
-    {showJoin && <Modal title="그룹 키로 참여" description="팀장에게 받은 8자리 그룹 키를 입력하세요." onClose={() => setShowJoin(false)}><form className="form modal-form" onSubmit={join}>
-      <label className="field"><span>그룹 키</span><input autoFocus required minLength={8} maxLength={12} value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase().replace(/\s/g, ''))} placeholder="예: A2BC3D4E" /></label>
+    {showJoin && <Modal title={t('그룹 키로 참여', 'Join with a group key')} description={t('팀장에게 받은 8~12자리 그룹 키를 입력하세요.', 'Enter the 8–12 character key from your team leader.')} onClose={() => setShowJoin(false)}><form className="form modal-form" onSubmit={join}>
+      <label className="field"><span>{t('그룹 키', 'Group key')}</span><input autoFocus required minLength={8} maxLength={12} value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase().replace(/\s/g, ''))} placeholder="e.g. A2BC3D4E" /></label>
       {error && <p className="error">{error}</p>}
-      <div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowJoin(false)}>취소</button><button className="primary" disabled={saving || joinCode.length < 8}>{saving ? '참여 중...' : '그룹 참여'}</button></div>
+      <div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowJoin(false)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving || joinCode.length < 8}>{saving ? t('참여 중...', 'Joining...') : t('그룹 참여', 'Join group')}</button></div>
     </form></Modal>}
   </main></>;
 }
 
 const timezoneOptions = [
-  { value: 'Asia/Seoul', label: '서울 (UTC+09:00)' }, { value: 'Asia/Tokyo', label: '도쿄 (UTC+09:00)' },
-  { value: 'Asia/Shanghai', label: '상하이 (UTC+08:00)' }, { value: 'Asia/Singapore', label: '싱가포르 (UTC+08:00)' },
-  { value: 'America/Los_Angeles', label: '로스앤젤레스' }, { value: 'America/New_York', label: '뉴욕' },
-  { value: 'Europe/London', label: '런던' }, { value: 'Europe/Paris', label: '파리' }, { value: 'UTC', label: 'UTC' },
+  { value: 'Asia/Seoul', label: '서울 (UTC+09:00)', en: 'Seoul (UTC+09:00)' }, { value: 'Asia/Tokyo', label: '도쿄 (UTC+09:00)', en: 'Tokyo (UTC+09:00)' },
+  { value: 'Asia/Shanghai', label: '상하이 (UTC+08:00)', en: 'Shanghai (UTC+08:00)' }, { value: 'Asia/Singapore', label: '싱가포르 (UTC+08:00)', en: 'Singapore (UTC+08:00)' },
+  { value: 'America/Los_Angeles', label: '로스앤젤레스', en: 'Los Angeles' }, { value: 'America/New_York', label: '뉴욕', en: 'New York' },
+  { value: 'Europe/London', label: '런던', en: 'London' }, { value: 'Europe/Paris', label: '파리', en: 'Paris' }, { value: 'UTC', label: 'UTC', en: 'UTC' },
 ];

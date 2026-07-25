@@ -5,6 +5,7 @@ import com.teamproject.group.application.GroupAuthorization;
 import com.teamproject.group.domain.GroupMember;
 import com.teamproject.task.application.dto.TaskDtos.CreateTaskRequest;
 import com.teamproject.task.application.dto.TaskDtos.AssignTaskRequest;
+import com.teamproject.task.application.dto.TaskDtos.ClaimTaskRequest;
 import com.teamproject.task.application.dto.TaskDtos.TaskHistoryResponse;
 import com.teamproject.task.application.dto.TaskDtos.TaskResponse;
 import com.teamproject.task.application.dto.TaskDtos.TransitionTaskRequest;
@@ -98,6 +99,12 @@ public class TaskService {
                 requireStatus(task, Task.Status.IN_PROGRESS);
                 task.complete();
             }
+            case "REOPEN" -> {
+                requireReopenPermission(task, actor);
+                requireStatus(task, Task.Status.COMPLETED);
+                requireReason(reason);
+                task.reopen();
+            }
             case "CANCEL" -> {
                 requireCancelable(task, actor);
                 if (isTerminal(task.getStatus())) invalidTransition();
@@ -124,6 +131,21 @@ public class TaskService {
         task.assign(assignee);
         tasks.flush();
         notifications.taskAssigned(task, actor, assignee);
+        return response(task);
+    }
+
+    @Transactional
+    public TaskResponse claim(Long userId, Long taskId, ClaimTaskRequest request) {
+        Task task = task(taskId);
+        GroupMember actor = authorization.requireActiveMember(task.getGroup().getId(), userId);
+        requireVersion(task, request.expectedVersion());
+        if (task.getStatus() != Task.Status.TODO || task.getAssignee() != null) {
+            throw new ApplicationException("TASK_CLAIM_UNAVAILABLE", HttpStatus.CONFLICT,
+                    "이미 담당자가 있거나 지금은 담당할 수 없는 업무입니다.");
+        }
+        task.assign(actor);
+        tasks.flush();
+        notifications.taskAssigned(task, actor, actor);
         return response(task);
     }
 
@@ -196,6 +218,12 @@ public class TaskService {
         if (!leader && !requestedByActor) {
             throw new ApplicationException("TASK_CANCEL_FORBIDDEN", HttpStatus.FORBIDDEN,
                     "이 업무를 취소할 권한이 없습니다.");
+        }
+    }
+    private void requireReopenPermission(Task task, GroupMember actor) {
+        if (task.getGroup().getType() == Group.Type.TEAM && actor.getRole() != GroupMember.Role.LEADER) {
+            throw new ApplicationException("TASK_REOPEN_FORBIDDEN", HttpStatus.FORBIDDEN,
+                    "완료 업무는 그룹 팀장만 재개할 수 있습니다.");
         }
     }
     private void requireEditable(Task task, GroupMember actor) {

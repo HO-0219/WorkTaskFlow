@@ -121,6 +121,26 @@ class NotificationApiTest {
     }
 
     @Test
+    void nicknameTypedInCommentCreatesMentionNotificationWithoutPickerIds() throws Exception {
+        Fixture fixture = fixture("typed_mention");
+        long taskId = createTask(fixture.ownerToken(), fixture.groupId(), "텍스트 멘션 업무");
+
+        mvc.perform(post("/api/v1/tasks/{taskId}/comments", taskId)
+                        .header("Authorization", bearer(fixture.ownerToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"@알림 사용자 확인 부탁드립니다.\",\"mentionedMemberIds\":[]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mentions.length()").value(2));
+
+        mvc.perform(get("/api/v1/notifications")
+                        .header("Authorization", bearer(fixture.memberToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].type").value("COMMENT_MENTIONED"))
+                .andExpect(jsonPath("$.unreadCount").value(1));
+    }
+
+    @Test
     void newlyAddedEditMentionNotifiesOnceAndAnotherUserCannotReadIt() throws Exception {
         Fixture fixture = fixture("edit_mention");
         String thirdToken = signupAndLogin("notification_third", "notification-third@example.com");

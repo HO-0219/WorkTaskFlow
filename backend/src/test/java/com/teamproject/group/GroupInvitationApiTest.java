@@ -185,7 +185,7 @@ class GroupInvitationApiTest {
         Account owner = account("key_owner", "key-owner@example.com");
         Account member = account("key_member", "key-member@example.com");
         long teamId = team(owner.user(), "키 참여 팀");
-        String joinCode = groupService.get(owner.user().getId(), teamId).joinCode();
+        String joinCode = groupService.rotateJoinCode(owner.user().getId(), teamId).joinCode();
 
         mvc.perform(post("/api/v1/groups/join")
                         .header("Authorization", bearer(member))

@@ -1,9 +1,13 @@
-# Team Project 로컬 MVP
+# Work Task Flow 로컬 MVP
 
 로컬 MySQL을 기준으로 인증, 그룹·멤버십, 업무, 협업 알림, 캘린더와 대시보드를 제공하는 팀 프로젝트 MVP입니다.
 
 개발 순서와 현재 단계는 [`DevFlow.md`](./DevFlow.md), 날짜별 작업·검증 기록은 [`devLog/`](./devLog/)에서 관리합니다.
 사이트맵·와이어프레임·디자인 토큰·권한·ERD·API 기준은 [`docs/`](./docs/)에 있습니다.
+로컬부터 실제 운영까지의 5단계 환경 승급은 [`docs/environments/`](./docs/environments/)에서 관리합니다.
+결제 테스트와 비밀키 운영은 [`docs/payment/TossPaymentsIntegration.md`](./docs/payment/TossPaymentsIntegration.md),
+이미지 저장·EC2 전환 기준은 [`docs/deployment/ImageStorage.md`](./docs/deployment/ImageStorage.md),
+공개 사이트 구조와 검색 등록은 [`docs/deployment/SearchConsole.md`](./docs/deployment/SearchConsole.md)를 따릅니다.
 
 ## 포함 기능
 
@@ -91,6 +95,33 @@ npm run preview
 - 헬스 체크: http://localhost:8081/api/v1/health
 
 루트의 `.env`를 Spring Boot와 Vite가 함께 사용합니다. 새 환경에서는 추적되는 `.env.example`을 `.env`로 복사하고 로컬 DB 비밀번호와 32자 이상의 임의 JWT secret을 설정합니다. 실제 `.env`는 Git에 포함하지 않습니다. 개발 기준 DB는 `localhost:3306/teamProject`의 로컬 MySQL이며, Docker Compose는 기능 개발 완료 후 인프라 정리 단계에서 다시 맞춥니다. 이메일 발송은 꺼져 있어서 인증번호와 비밀번호 재설정·그룹 초대 링크가 백엔드 로그의 `[LOCAL MAIL]`에 출력됩니다. 그룹 초대 링크의 기본 만료 시간은 72시간이며 `GROUP_INVITATION_HOURS`로 변경할 수 있습니다.
+
+<!-- NGROK -->
+### ngrok 테스트
+
+백엔드와 프런트엔드를 평소처럼 실행한 뒤 프런트엔드 포트 하나만 외부에 연결합니다.
+
+```bash
+ngrok http 5174
+```
+
+ngrok이 출력한 HTTPS 주소가 `https://example.ngrok-free.app`이라면 루트 `.env`를 아래처럼 바꾸고 백엔드를 재시작합니다.
+
+```properties
+FRONTEND_URL=https://example.ngrok-free.app
+AUTH_SECURE_COOKIE=true
+SERVER_FORWARD_HEADERS_STRATEGY=framework
+```
+
+API와 소셜 로그인 요청은 프런트엔드 개발 서버가 로컬 백엔드 `8081` 포트로 전달하므로 백엔드용 ngrok 터널은 만들지 않습니다. 무료 도메인이 바뀌면 `FRONTEND_URL`도 다시 바꿔야 합니다.
+
+소셜 로그인을 테스트할 때는 각 제공자의 개발자 콘솔에도 다음 HTTPS Redirect URI를 등록합니다.
+
+- Google: `https://example.ngrok-free.app/login/oauth2/code/google`
+- Kakao: `https://example.ngrok-free.app/login/oauth2/code/kakao`
+
+ngrok 테스트를 끝내고 HTTP localhost로 돌아올 때는 `.env`의 `FRONTEND_URL=http://localhost:5174`, `AUTH_SECURE_COOKIE=false`로 복원하고 백엔드를 재시작합니다.
+<!-- NGROK -->
 
 ### 로컬 시연 데이터
 

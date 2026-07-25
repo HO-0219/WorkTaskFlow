@@ -1,5 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Team Project">
-  <rect width="512" height="512" rx="112" fill="#5268d5"/>
-  <path fill="#fff" d="M112 126h288v72h-99v206h-90V198h-99z"/>
-  <circle cx="373" cy="373" r="43" fill="#aebaff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Work Task Flow">
+  <defs>
+    <linearGradient id="bg" x1="70" y1="48" x2="440" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8175EA"/>
+      <stop offset="1" stop-color="#4F43B7"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+  <path d="M138 151h166c51 0 86 35 86 84s-35 84-86 84H200" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round"/>
+  <path d="m250 267-62 52 62 52" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="125" cy="151" r="38" fill="#DCD8FF" stroke="#fff" stroke-width="18"/>
+  <circle cx="388" cy="235" r="38" fill="#FFCF8C" stroke="#fff" stroke-width="18"/>
+  <circle cx="187" cy="319" r="38" fill="#9DE4C8" stroke="#fff" stroke-width="18"/>
 </svg>

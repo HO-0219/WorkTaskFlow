@@ -25,6 +25,7 @@ public final class CommentDtos {
 
     public record CommentResponse(
             Long id, Long taskId, Long authorMemberId, String authorNickname,
-            String content, boolean deleted, List<CommentMentionResponse> mentions, long version,
+            String content, boolean deleted, boolean recordLocked,
+            List<CommentMentionResponse> mentions, long version,
             LocalDateTime createdAt, LocalDateTime updatedAt, LocalDateTime deletedAt) {}
 }

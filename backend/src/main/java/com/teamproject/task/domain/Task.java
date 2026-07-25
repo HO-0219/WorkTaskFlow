@@ -106,6 +106,11 @@ public class Task {
         changeStatus(Status.COMPLETED);
     }
 
+    public void reopen() {
+        this.completedAt = null;
+        changeStatus(Status.IN_PROGRESS);
+    }
+
     public void cancel(String reason) {
         this.stopReason = reason;
         changeStatus(Status.CANCELLED);

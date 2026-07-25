@@ -1,5 +1,5 @@
-const CACHE_NAME = 'team-project-shell-v1';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/app-icon.svg'];
+const CACHE_NAME = 'work-task-flow-shell-v4';
+const APP_SHELL = ['/', '/app', '/manifest.webmanifest', '/icons/app-icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -24,7 +24,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) {
     event.respondWith(fetch(request).catch(() => new Response(JSON.stringify({
       code: 'OFFLINE',
       message: '오프라인에서는 새 데이터를 불러오거나 변경할 수 없습니다.',
@@ -33,7 +33,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('/')));
+    event.respondWith(fetch(request).catch(async () => (await caches.match(request)) || caches.match('/')));
     return;
   }
 

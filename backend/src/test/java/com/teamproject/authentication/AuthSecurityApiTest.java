@@ -10,7 +10,10 @@ import com.teamproject.authentication.infrastructure.crypto.HashService;
 import com.teamproject.authentication.infrastructure.web.RefreshCookieService;
 import com.teamproject.jwt.JwtService;
 import com.teamproject.user.domain.User;
+import com.teamproject.user.domain.UserConsentRepository;
 import com.teamproject.user.domain.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -40,8 +43,10 @@ class AuthSecurityApiTest {
     @Autowired SignupService signupService;
     @Autowired OneTimeTokenService oneTimeTokens;
     @Autowired UserRepository users;
+    @Autowired UserConsentRepository consents;
     @Autowired OneTimeTokenRepository tokenRepository;
     @Autowired HashService hashService;
+    @Autowired ObjectMapper objectMapper;
 
     @Test
     void loginReturnsAccessTokenAndProtectedRefreshCookieOnly() throws Exception {
@@ -87,9 +92,11 @@ class AuthSecurityApiTest {
                 .andExpect(status().isNoContent());
         mvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"contract_user\",\"email\":\"contract@example.com\",\"name\":\"계약 사용자\",\"password\":\"password123!\",\"verificationCode\":\"" + code + "\"}"))
+                        .content("{\"username\":\"contract_user\",\"email\":\"contract@example.com\",\"name\":\"계약 사용자\",\"password\":\"password123!\",\"verificationCode\":\"" + code + "\",\"termsAgreed\":true,\"privacyAgreed\":true,\"ageConfirmed\":true,\"notificationAgreed\":false,\"marketingAgreed\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("contract_user"));
+        User contractUser = users.findByUsernameIgnoreCase("contract_user").orElseThrow();
+        assertThat(consents.findAllByUserId(contractUser.getId())).hasSize(5);
         mvc.perform(post("/api/v1/auth/username-reminders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"contract@example.com\"}"))
@@ -98,6 +105,27 @@ class AuthSecurityApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.google").value(false))
                 .andExpect(jsonPath("$.kakao").value(false));
+    }
+
+    @Test
+    void publicDemoIssuesAReadOnlySession() throws Exception {
+        signup("demo_leader", "demo-leader@local.test");
+        String response = mvc.perform(post("/api/v1/auth/demo-session"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode token = objectMapper.readTree(response);
+
+        mvc.perform(get("/api/v1/auth/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.get("accessToken").asText()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("demo_leader"));
+        mvc.perform(post("/api/v1/groups")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.get("accessToken").asText())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("DEMO_READ_ONLY"));
     }
 
     @Test

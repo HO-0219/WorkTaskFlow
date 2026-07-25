@@ -15,14 +15,16 @@ public class Group {
     private String name;
     @Column(length = 500)
     private String description;
+    @Column(length = 500)
+    private String imageUrl;
     @Column(nullable = false, length = 50)
     private String timezone;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20)
     private DashboardVisibility dashboardVisibility;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20)
     private MembershipPlan membershipPlan;
-    @Column(length = 12, unique = true)
-    private String joinCode;
+    @Column(name = "join_code_hash", length = 64, unique = true)
+    private String joinCodeHash;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
@@ -35,14 +37,14 @@ public class Group {
 
     private Group(Type type, String name, String description, String timezone,
             DashboardVisibility dashboardVisibility, MembershipPlan membershipPlan,
-            String joinCode, User createdBy) {
+            String joinCodeHash, User createdBy) {
         this.type = type;
         this.name = name;
         this.description = description;
         this.timezone = timezone;
         this.dashboardVisibility = dashboardVisibility;
         this.membershipPlan = membershipPlan;
-        this.joinCode = joinCode;
+        this.joinCodeHash = joinCodeHash;
         this.createdBy = createdBy;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = createdAt;
@@ -57,9 +59,9 @@ public class Group {
         return team(name, description, timezone, null, creator);
     }
 
-    public static Group team(String name, String description, String timezone, String joinCode, User creator) {
+    public static Group team(String name, String description, String timezone, String joinCodeHash, User creator) {
         return new Group(Type.TEAM, name, description, timezone,
-                DashboardVisibility.MEMBERS, MembershipPlan.FREE, joinCode, creator);
+                DashboardVisibility.MEMBERS, MembershipPlan.FREE, joinCodeHash, creator);
     }
 
     public void updateSettings(String name, String description, String timezone,
@@ -71,14 +73,31 @@ public class Group {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void updateImage(String imageUrl) {
+        this.imageUrl = imageUrl;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void issueJoinCodeHash(String joinCodeHash) {
+        if (type != Type.TEAM) throw new IllegalStateException("Personal groups cannot have a join code.");
+        this.joinCodeHash = joinCodeHash;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void revokeJoinCode() {
+        this.joinCodeHash = null;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public Long getId() { return id; }
     public Type getType() { return type; }
     public String getName() { return name; }
     public String getDescription() { return description; }
+    public String getImageUrl() { return imageUrl; }
     public String getTimezone() { return timezone; }
     public DashboardVisibility getDashboardVisibility() { return dashboardVisibility; }
     public MembershipPlan getMembershipPlan() { return membershipPlan; }
-    public String getJoinCode() { return joinCode; }
+    public String getJoinCodeHash() { return joinCodeHash; }
     public User getCreatedBy() { return createdBy; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

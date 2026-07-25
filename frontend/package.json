@@ -1,5 +1,5 @@
 {
-  "name": "team-project-auth-web",
+  "name": "work-task-flow-web",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -20,4 +20,3 @@
   },
   "devDependencies": {}
 }
-

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { activatePwaUpdate, isPwaInstallAvailable, isPwaUpdateAvailable, promptPwaInstall } from './pwa';
+import { useLanguage } from './LanguageContext';
 
 export function PwaStatus() {
+  const { t } = useLanguage();
+  const { pathname } = useLocation();
   const [online, setOnline] = useState(navigator.onLine);
   const [installable, setInstallable] = useState(isPwaInstallAvailable());
   const [updateAvailable, setUpdateAvailable] = useState(isPwaUpdateAvailable());
@@ -26,12 +30,12 @@ export function PwaStatus() {
     };
   }, []);
 
-  if (online && !installable && !updateAvailable) return null;
+  if (pathname === '/' || (online && !installable && !updateAvailable)) return null;
   return <aside className={`pwa-status ${online ? '' : 'offline'}`} role="status" aria-live="polite">
     <span>{!online
-      ? '오프라인입니다. 저장된 화면만 볼 수 있으며 조회·변경은 연결 후 가능합니다.'
-      : updateAvailable ? '새 버전이 준비되었습니다.' : '이 기기에 앱으로 설치할 수 있습니다.'}</span>
-    {online && updateAvailable && <button type="button" onClick={activatePwaUpdate}>업데이트</button>}
-    {online && !updateAvailable && installable && <button type="button" onClick={promptPwaInstall}>설치</button>}
+      ? t('오프라인입니다. 저장된 화면만 볼 수 있으며 조회·변경은 연결 후 가능합니다.', 'You are offline. Reconnect to view or update current data.')
+      : updateAvailable ? t('새 버전이 준비되었습니다.', 'A new version is ready.') : t('이 기기에 앱으로 설치할 수 있습니다.', 'You can install this app on this device.')}</span>
+    {online && updateAvailable && <button type="button" onClick={activatePwaUpdate}>{t('업데이트', 'Update')}</button>}
+    {online && !updateAvailable && installable && <button type="button" onClick={promptPwaInstall}>{t('설치', 'Install')}</button>}
   </aside>;
 }

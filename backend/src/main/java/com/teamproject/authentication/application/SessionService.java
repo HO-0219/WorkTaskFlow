@@ -10,20 +10,30 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 public class SessionService {
+    private static final Logger securityLog = LoggerFactory.getLogger("SECURITY_AUDIT");
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokens;
     private final AccessSessionIssuer issuer;
+    private final boolean demoEnabled;
+    private final String demoUsername;
 
     public SessionService(UserRepository users, PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokens, AccessSessionIssuer issuer) {
+            RefreshTokenService refreshTokens, AccessSessionIssuer issuer,
+            @Value("${app.demo.enabled:true}") boolean demoEnabled,
+            @Value("${app.demo.username:demo_leader}") String demoUsername) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokens = refreshTokens;
         this.issuer = issuer;
+        this.demoEnabled = demoEnabled;
+        this.demoUsername = demoUsername;
     }
 
     @Transactional
@@ -33,6 +43,21 @@ public class SessionService {
             throw credentials();
         }
         user.recordLogin();
+        securityLog.info("event=LOGIN outcome=SUCCESS actorUserId={}", user.getId());
+        return issuer.issue(user);
+    }
+
+    @Transactional
+    public IssuedTokens demo() {
+        if (!demoEnabled) {
+            throw new ApplicationException("DEMO_DISABLED", HttpStatus.SERVICE_UNAVAILABLE,
+                    "현재 데모 체험을 이용할 수 없습니다.");
+        }
+        User user = users.findByUsernameIgnoreCase(demoUsername).filter(User::isActive).orElseThrow(() ->
+                new ApplicationException("DEMO_NOT_READY", HttpStatus.SERVICE_UNAVAILABLE,
+                        "데모 데이터가 아직 준비되지 않았습니다."));
+        user.recordLogin();
+        securityLog.info("event=DEMO_LOGIN outcome=SUCCESS actorUserId={}", user.getId());
         return issuer.issue(user);
     }
 

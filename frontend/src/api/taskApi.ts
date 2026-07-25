@@ -24,7 +24,7 @@ export type TaskResponse = {
   updatedAt: string;
 };
 
-export type TaskAction = 'ACCEPT' | 'REJECT' | 'START' | 'HOLD' | 'RESUME' | 'COMPLETE' | 'CANCEL';
+export type TaskAction = 'ACCEPT' | 'REJECT' | 'START' | 'HOLD' | 'RESUME' | 'COMPLETE' | 'REOPEN' | 'CANCEL';
 
 export type TaskHistoryResponse = {
   id: number;
@@ -87,6 +87,10 @@ export const taskApi = {
   assign: (taskId: number, assigneeMemberId: number, expectedVersion: number) =>
     request<TaskResponse>(`/tasks/${taskId}/assignee`, {
       method: 'PUT', body: JSON.stringify({ assigneeMemberId, expectedVersion }),
+    }, true),
+  claim: (taskId: number, expectedVersion: number) =>
+    request<TaskResponse>(`/tasks/${taskId}/assignee/me`, {
+      method: 'PUT', body: JSON.stringify({ expectedVersion }),
     }, true),
   histories: (taskId: number) => request<TaskHistoryResponse[]>(`/tasks/${taskId}/histories`, {}, true),
   checklist: (taskId: number) => request<ChecklistResponse>(`/tasks/${taskId}/checklist-items`, {}, true),

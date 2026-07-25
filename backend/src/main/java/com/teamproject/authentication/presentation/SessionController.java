@@ -26,6 +26,12 @@ public class SessionController {
         cookies.add(response, tokens.refreshToken());
         return tokens.response();
     }
+    @PostMapping("/demo-session")
+    TokenResponse demo(HttpServletResponse response) {
+        var tokens = sessions.demo();
+        cookies.add(response, tokens.refreshToken());
+        return tokens.response();
+    }
     @PostMapping("/refresh")
     TokenResponse refresh(@CookieValue(name = RefreshCookieService.NAME, required = false) String refreshToken,
             HttpServletResponse response) {

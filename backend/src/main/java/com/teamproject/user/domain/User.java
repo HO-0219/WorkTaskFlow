@@ -37,6 +37,8 @@ public class User {
     private LocalDateTime updatedAt = LocalDateTime.now();
     private LocalDateTime lastLoginAt;
     private LocalDateTime withdrawnAt;
+    @Column(length = 100, unique = true)
+    private String paymentCustomerKey;
 
     protected User() {}
 
@@ -62,6 +64,12 @@ public class User {
         touch();
     }
     public void suspend() { this.status = Status.SUSPENDED; touch(); }
+    public void ensurePaymentCustomerKey(String value) {
+        if (this.paymentCustomerKey == null) {
+            this.paymentCustomerKey = value;
+            touch();
+        }
+    }
     public void anonymizeAndWithdraw(String anonymizedUsername, String anonymizedEmail) {
         this.username = anonymizedUsername;
         this.email = anonymizedEmail;
@@ -94,6 +102,7 @@ public class User {
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public LocalDateTime getLastLoginAt() { return lastLoginAt; }
     public LocalDateTime getWithdrawnAt() { return withdrawnAt; }
+    public String getPaymentCustomerKey() { return paymentCustomerKey; }
 
     public enum SystemRole { USER, ADMIN }
     public enum Status { ACTIVE, SUSPENDED, WITHDRAWN }

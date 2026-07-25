@@ -20,8 +20,8 @@ public final class GroupDtos {
             String dashboardVisibility) {}
 
     public record GroupResponse(
-            Long id, String type, String name, String description, String timezone,
-            String dashboardVisibility, String membershipPlan, String joinCode,
+            Long id, String type, String name, String description, String imageUrl, String timezone,
+            String dashboardVisibility, String membershipPlan, boolean joinCodeActive, String joinCode,
             Long memberId, String role,
             LocalDateTime createdAt, LocalDateTime updatedAt) {}
 

@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -99,6 +101,39 @@ class GroupApiTest {
                 .andExpect(jsonPath("$.name").value("설정 완료 팀"))
                 .andExpect(jsonPath("$.description").value("수정된 설명"))
                 .andExpect(jsonPath("$.dashboardVisibility").value("LEADER_ONLY"));
+    }
+
+    @Test
+    void leaderCanRotateDeleteAndCreateJoinCode() throws Exception {
+        String token = signupAndLogin("key_owner", "key-owner@example.com");
+        var created = mvc.perform(post("/api/v1/groups").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"키 관리 팀\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.joinCode").isString())
+                .andReturn();
+        long groupId = ((Number) com.jayway.jsonpath.JsonPath.read(
+                created.getResponse().getContentAsString(), "$.id")).longValue();
+        String original = com.jayway.jsonpath.JsonPath.read(created.getResponse().getContentAsString(), "$.joinCode");
+
+        var rotated = mvc.perform(put("/api/v1/groups/{groupId}/join-code", groupId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.joinCode").isString())
+                .andReturn();
+        String replacement = com.jayway.jsonpath.JsonPath.read(rotated.getResponse().getContentAsString(), "$.joinCode");
+        assertThat(replacement).isNotEqualTo(original);
+
+        mvc.perform(delete("/api/v1/groups/{groupId}/join-code", groupId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/groups/{groupId}", groupId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.joinCode").doesNotExist());
+        mvc.perform(post("/api/v1/groups/{groupId}/join-code", groupId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.joinCode").isString());
     }
 
     @Test

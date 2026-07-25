@@ -69,6 +69,40 @@ class TaskWorkflowApiTest {
     }
 
     @Test
+    void activeMemberClaimsAnUnassignedTodoOnlyOnce() throws Exception {
+        String ownerToken = signupAndLogin("claim_owner", "claim-owner@example.com");
+        long groupId = createTeam(ownerToken, "자율 배정 팀");
+        String memberToken = signupAndLogin("claim_member", "claim-member@example.com");
+        GroupMember member = addMember(groupId, "claim_member");
+        String otherToken = signupAndLogin("claim_other", "claim-other@example.com");
+        addMember(groupId, "claim_other");
+        long taskId = createTask(ownerToken, groupId, "자율 선택 업무");
+
+        mvc.perform(put("/api/v1/tasks/{taskId}/assignee/me", taskId)
+                        .header("Authorization", "Bearer " + memberToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":0}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TASK_CLAIM_UNAVAILABLE"));
+
+        transition(ownerToken, taskId, "ACCEPT", null, 0).andExpect(status().isOk());
+        mvc.perform(put("/api/v1/tasks/{taskId}/assignee/me", taskId)
+                        .header("Authorization", "Bearer " + memberToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeMemberId").value(member.getId()))
+                .andExpect(jsonPath("$.version").value(2));
+
+        mvc.perform(put("/api/v1/tasks/{taskId}/assignee/me", taskId)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":2}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TASK_CLAIM_UNAVAILABLE"));
+    }
+
+    @Test
     void assigneeRunsTodoThroughHoldResumeAndCompletionWithHistories() throws Exception {
         String ownerToken = signupAndLogin("lifecycle_owner", "lifecycle-owner@example.com");
         long ownerId = users.findByUsernameIgnoreCase("lifecycle_owner").orElseThrow().getId();
@@ -100,16 +134,26 @@ class TaskWorkflowApiTest {
                 .andExpect(jsonPath("$.completedAt").isNotEmpty())
                 .andExpect(jsonPath("$.delayed").value(false))
                 .andExpect(jsonPath("$.version").value(6));
+        transition(ownerToken, taskId, "REOPEN", null, 6)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TASK_REASON_REQUIRED"));
+        transition(ownerToken, taskId, "REOPEN", "추가 검토 필요", 6)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.completedAt").doesNotExist())
+                .andExpect(jsonPath("$.version").value(7));
 
         mvc.perform(get("/api/v1/tasks/{taskId}/histories", taskId)
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(6))
+                .andExpect(jsonPath("$.length()").value(7))
                 .andExpect(jsonPath("$[0].fromStatus").doesNotExist())
                 .andExpect(jsonPath("$[0].toStatus").value("REQUESTED"))
                 .andExpect(jsonPath("$[3].toStatus").value("ON_HOLD"))
                 .andExpect(jsonPath("$[3].reason").value("외부 검토 대기"))
-                .andExpect(jsonPath("$[5].toStatus").value("COMPLETED"));
+                .andExpect(jsonPath("$[5].toStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$[6].toStatus").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$[6].reason").value("추가 검토 필요"));
     }
 
     @Test

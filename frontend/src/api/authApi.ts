@@ -5,6 +5,8 @@ export type ProviderResponse = { google: boolean; kakao: boolean };
 export type MeResponse = { userId: number; username: string; email: string; name: string; role: string };
 export type SignupRequest = {
   username: string; email: string; name: string; password: string; verificationCode: string;
+  termsAgreed: boolean; privacyAgreed: boolean; ageConfirmed: boolean;
+  notificationAgreed: boolean; marketingAgreed: boolean;
 };
 
 export const authApi = {
@@ -15,6 +17,7 @@ export const authApi = {
   signup: (body: SignupRequest) => request('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
   login: (username: string, password: string) =>
     request<TokenResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  demo: () => request<TokenResponse>('/auth/demo-session', { method: 'POST' }),
   refresh: () => request<TokenResponse>('/auth/refresh', { method: 'POST' }),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
   remindUsername: (email: string) =>

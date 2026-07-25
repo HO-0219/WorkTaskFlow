@@ -10,6 +10,10 @@ let updateRequested = false;
 
 export function isPwaInstallAvailable() { return Boolean(installPrompt); }
 export function isPwaUpdateAvailable() { return Boolean(registration?.waiting); }
+export function isRunningStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || ('standalone' in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+}
 
 export function registerPwa() {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
@@ -49,12 +53,14 @@ export function registerPwa() {
 }
 
 export async function promptPwaInstall() {
-  if (!installPrompt) return;
+  if (!installPrompt) return false;
   const prompt = installPrompt;
   installPrompt = undefined;
   await prompt.prompt();
-  await prompt.userChoice;
-  window.dispatchEvent(new Event('pwa-installed'));
+  const choice = await prompt.userChoice;
+  if (choice.outcome === 'accepted') window.dispatchEvent(new Event('pwa-installed'));
+  else window.dispatchEvent(new Event('pwa-install-available'));
+  return choice.outcome === 'accepted';
 }
 
 export function activatePwaUpdate() {

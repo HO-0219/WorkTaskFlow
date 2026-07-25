@@ -13,13 +13,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.web.cors.*;
 import java.util.List;
 
 @Configuration
 public class SecurityConfig {
     @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter,
-            OAuth2SuccessHandler successHandler, @Value("${app.frontend-url}") String frontendUrl) throws Exception {
+            SecurityAuditFilter auditFilter, SensitiveEndpointRateLimitFilter rateLimitFilter,
+            DemoReadOnlyFilter demoReadOnlyFilter, OAuth2SuccessHandler successHandler,
+            @Value("${app.frontend-url}") String frontendUrl) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfiguration(frontendUrl)))
@@ -36,6 +39,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/email-verifications/**",
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
+                                "/api/v1/auth/demo-session",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
                                 "/api/v1/auth/username-reminders",
@@ -44,10 +48,29 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler)
                         .failureHandler((request, response, exception) -> response.sendRedirect(frontendUrl + "/login?socialError=SOCIAL_LOGIN_FAILED")))
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(demoReadOnlyFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(auditFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    @Bean FilterRegistrationBean<SecurityAuditFilter> auditFilterRegistration(SecurityAuditFilter filter) {
+        var registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+    @Bean FilterRegistrationBean<SensitiveEndpointRateLimitFilter> rateLimitFilterRegistration(
+            SensitiveEndpointRateLimitFilter filter) {
+        var registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+    @Bean FilterRegistrationBean<DemoReadOnlyFilter> demoReadOnlyFilterRegistration(DemoReadOnlyFilter filter) {
+        var registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
     private CorsConfigurationSource corsConfiguration(String frontendUrl) {
         var config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(frontendUrl));

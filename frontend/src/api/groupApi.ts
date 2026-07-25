@@ -5,9 +5,11 @@ export type GroupResponse = {
   type: 'PERSONAL' | 'TEAM';
   name: string;
   description?: string;
+  imageUrl?: string;
   timezone: string;
   dashboardVisibility: 'LEADER_ONLY' | 'MEMBERS';
   membershipPlan: 'FREE' | 'PAID';
+  joinCodeActive: boolean;
   joinCode?: string;
   memberId: number;
   role: 'LEADER' | 'MEMBER';
@@ -81,6 +83,20 @@ export const groupApi = {
   get: (groupId: number) => request<GroupResponse>(`/groups/${groupId}`, {}, true),
   update: (groupId: number, body: UpdateGroupRequest) => request<GroupResponse>(`/groups/${groupId}`, {
     method: 'PATCH', body: JSON.stringify(body),
+  }, true),
+  uploadImage: (groupId: number, file: File) => {
+    const body = new FormData();
+    body.append('file', file);
+    return request<GroupResponse>(`/groups/${groupId}/image`, { method: 'POST', body }, true);
+  },
+  createJoinCode: (groupId: number) => request<GroupResponse>(`/groups/${groupId}/join-code`, {
+    method: 'POST',
+  }, true),
+  rotateJoinCode: (groupId: number) => request<GroupResponse>(`/groups/${groupId}/join-code`, {
+    method: 'PUT',
+  }, true),
+  revokeJoinCode: (groupId: number) => request<void>(`/groups/${groupId}/join-code`, {
+    method: 'DELETE',
   }, true),
   members: (groupId: number) => request<MemberResponse[]>(`/groups/${groupId}/members`, {}, true),
   invitations: (groupId: number) => request<InvitationResponse[]>(`/groups/${groupId}/invitations`, {}, true),

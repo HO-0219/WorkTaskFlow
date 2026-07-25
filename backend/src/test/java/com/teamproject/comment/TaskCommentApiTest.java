@@ -10,6 +10,7 @@ import com.teamproject.authentication.application.token.OneTimeTokenService;
 import com.teamproject.group.domain.GroupMember;
 import com.teamproject.group.domain.GroupMemberRepository;
 import com.teamproject.group.domain.GroupRepository;
+import com.teamproject.comment.domain.CommentRevisionRepository;
 import com.teamproject.user.domain.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,7 @@ class TaskCommentApiTest {
     @Autowired UserRepository users;
     @Autowired GroupRepository groups;
     @Autowired GroupMemberRepository members;
+    @Autowired CommentRevisionRepository revisions;
 
     @Test
     void activeMembersCreateAndAuthorUpdatesAndSoftDeletes() throws Exception {
@@ -58,6 +60,7 @@ class TaskCommentApiTest {
                 .andExpect(jsonPath("$.content").value("수정 댓글"))
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty())
                 .andExpect(jsonPath("$.version").value(1));
+        org.assertj.core.api.Assertions.assertThat(revisions.count()).isEqualTo(1);
 
         mvc.perform(delete("/api/v1/comments/{commentId}", commentId)
                         .param("expectedVersion", "1")
@@ -138,11 +141,37 @@ class TaskCommentApiTest {
         transition(fixture.memberToken(), fixture.taskId(), "START", 2);
         transition(fixture.memberToken(), fixture.taskId(), "COMPLETE", 3);
 
-        createComment(fixture.memberToken(), fixture.taskId(), "완료 후 회고");
+        long commentId = createComment(fixture.memberToken(), fixture.taskId(), "완료 후 회고");
         mvc.perform(get("/api/v1/tasks/{taskId}/comments", fixture.taskId())
                         .header("Authorization", bearer(fixture.ownerToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].content").value("완료 후 회고"));
+        mvc.perform(patch("/api/v1/comments/{commentId}", commentId)
+                        .header("Authorization", bearer(fixture.memberToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"완료 후 수정\",\"expectedVersion\":0}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COMMENT_RECORD_LOCKED"));
+        mvc.perform(delete("/api/v1/comments/{commentId}", commentId)
+                        .param("expectedVersion", "0")
+                        .header("Authorization", bearer(fixture.memberToken())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COMMENT_RECORD_LOCKED"));
+        mvc.perform(post("/api/v1/tasks/{taskId}/transitions", fixture.taskId())
+                        .header("Authorization", bearer(fixture.ownerToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"REOPEN\",\"reason\":\"후속 작업\",\"expectedVersion\":4}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/tasks/{taskId}/comments", fixture.taskId())
+                        .header("Authorization", bearer(fixture.ownerToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].recordLocked").value(true));
+        mvc.perform(patch("/api/v1/comments/{commentId}", commentId)
+                        .header("Authorization", bearer(fixture.memberToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"재개 후 과거 수정\",\"expectedVersion\":0}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COMMENT_RECORD_LOCKED"));
     }
 
     @Test

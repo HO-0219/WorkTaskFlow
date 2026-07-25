@@ -2,10 +2,12 @@
 .idea/
 .vscode/
 backend/target/
+backend/logs/
+backend/uploads/*
+!backend/uploads/.gitignore
 frontend/node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
 *.iml
-

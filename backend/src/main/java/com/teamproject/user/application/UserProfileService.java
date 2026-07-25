@@ -5,15 +5,21 @@ import com.teamproject.user.application.dto.UserProfileDtos.ProfileResponse;
 import com.teamproject.user.application.dto.UserProfileDtos.UpdateProfileRequest;
 import com.teamproject.user.domain.User;
 import com.teamproject.user.domain.UserRepository;
+import com.teamproject.common.storage.ImageStorageService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class UserProfileService {
     private final UserRepository users;
+    private final ImageStorageService images;
 
-    public UserProfileService(UserRepository users) { this.users = users; }
+    public UserProfileService(UserRepository users, ImageStorageService images) {
+        this.users = users;
+        this.images = images;
+    }
 
     @Transactional(readOnly = true)
     public ProfileResponse get(Long userId) { return response(find(userId)); }
@@ -22,6 +28,16 @@ public class UserProfileService {
     public ProfileResponse update(Long userId, UpdateProfileRequest request) {
         User user = find(userId);
         user.updateProfile(request.nickname().trim(), blankToNull(request.phoneNumber()), blankToNull(request.profileImageUrl()));
+        return response(user);
+    }
+
+    @Transactional
+    public ProfileResponse uploadImage(Long userId, MultipartFile file) {
+        User user = find(userId);
+        String previous = user.getProfileImageUrl();
+        user.updateProfile(user.getNickname(), user.getPhoneNumber(), images.store(file, "profiles"));
+        users.flush();
+        images.deleteManagedAfterCommit(previous);
         return response(user);
     }
 

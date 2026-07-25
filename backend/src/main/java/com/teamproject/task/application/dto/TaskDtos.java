@@ -32,6 +32,9 @@ public final class TaskDtos {
             @NotNull @Positive Long assigneeMemberId,
             @NotNull @PositiveOrZero Long expectedVersion) {}
 
+    public record ClaimTaskRequest(
+            @NotNull @PositiveOrZero Long expectedVersion) {}
+
     public record UpdateTaskRequest(
             @Size(max = 120) String title,
             @Size(max = 5000) String description,

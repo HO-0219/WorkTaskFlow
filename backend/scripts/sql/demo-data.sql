@@ -34,6 +34,7 @@ DELETE FROM group_members WHERE group_id IN (SELECT id FROM demo_group_ids);
 DELETE FROM work_groups WHERE id IN (SELECT id FROM demo_group_ids);
 DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM demo_user_ids);
 DELETE FROM social_accounts WHERE user_id IN (SELECT id FROM demo_user_ids);
+DELETE FROM user_consents WHERE user_id IN (SELECT id FROM demo_user_ids);
 DELETE FROM one_time_tokens WHERE email IN (
   'demo-leader@local.test', 'demo-member@local.test', 'demo-viewer@local.test'
 );

@@ -3,6 +3,7 @@ package com.teamproject.task.presentation;
 import com.teamproject.task.application.TaskService;
 import com.teamproject.task.application.dto.TaskDtos.CreateTaskRequest;
 import com.teamproject.task.application.dto.TaskDtos.AssignTaskRequest;
+import com.teamproject.task.application.dto.TaskDtos.ClaimTaskRequest;
 import com.teamproject.task.application.dto.TaskDtos.TaskHistoryResponse;
 import com.teamproject.task.application.dto.TaskDtos.TaskResponse;
 import com.teamproject.task.application.dto.TaskDtos.TransitionTaskRequest;
@@ -52,6 +53,12 @@ public class TaskController {
     TaskResponse assign(Authentication authentication, @PathVariable Long taskId,
             @Valid @RequestBody AssignTaskRequest request) {
         return tasks.assign((Long) authentication.getPrincipal(), taskId, request);
+    }
+
+    @PutMapping("/tasks/{taskId}/assignee/me")
+    TaskResponse claim(Authentication authentication, @PathVariable Long taskId,
+            @Valid @RequestBody ClaimTaskRequest request) {
+        return tasks.claim((Long) authentication.getPrincipal(), taskId, request);
     }
 
     @GetMapping("/tasks/{taskId}/histories")
