@@ -45,7 +45,7 @@ public class TossPaymentsClient {
             String idempotencyKey) {
         return post("/v1/billing/" + billingKey, Map.of(
                 "customerKey", customerKey, "amount", amount, "orderId", orderId,
-                "orderName", "Work Task Flow 연동 테스트"), idempotencyKey);
+                "orderName", "ToTaskFlow 연동 테스트"), idempotencyKey);
     }
 
     private ApiResult post(String path, Object body, String idempotencyKey) {

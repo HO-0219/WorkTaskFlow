@@ -7,7 +7,7 @@ export function AuthLayout({ title, description, children }: {
   title: string; description: string; children: ReactNode;
 }) {
   const { t } = useLanguage();
-  return <main className="auth-page"><section className="brand"><span className="brand-mark"><BrandMark /></span><p>WORK TASK FLOW</p><h1>{t('업무의 시작부터 완료까지', 'From kickoff to completion')}<br />{t('한 흐름으로 연결하세요.', 'keep work in one flow.')}</h1><span>{t('팀의 일정과 진행 상황을 놓치지 않고 함께 관리합니다.', 'Keep team schedules and progress visible in one place.')}</span></section><section className="auth-card"><header><Link to="/" className="mobile-logo"><BrandMark />Work Task Flow</Link><h2>{title}</h2><p>{description}</p></header>{children}</section></main>;
+  return <main className="auth-page"><section className="brand"><span className="brand-mark"><BrandMark /></span><p>TOTASKFLOW</p><h1>{t('업무의 시작부터 완료까지', 'From kickoff to completion')}<br />{t('한 흐름으로 연결하세요.', 'keep work in one flow.')}</h1><span>{t('팀의 일정과 진행 상황을 놓치지 않고 함께 관리합니다.', 'Keep team schedules and progress visible in one place.')}</span></section><section className="auth-card"><header><Link to="/" className="mobile-logo"><BrandMark />ToTaskFlow</Link><h2>{title}</h2><p>{description}</p></header>{children}</section></main>;
 }
 
 export function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {

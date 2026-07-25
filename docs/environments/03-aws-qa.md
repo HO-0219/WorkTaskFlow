@@ -7,7 +7,7 @@ EC2, Nginx, 영속 DB·파일 저장소, HTTPS, 로그와 백업을 실제 배�
 ## 권장 분리
 
 - 운영과 다른 AWS 계정 또는 최소한 다른 VPC·리소스·IAM 역할
-- QA 전용 서브도메인: `qa.example.com`
+- QA 전용 서브도메인: `qa.totaskflow.com`
 - QA 전용 EC2, DB, 업로드 볼륨, 메일 발송자, OAuth 앱, Toss 테스트키
 - AWS Budget 비용 알림과 리소스 태그 `Environment=qa`
 
@@ -15,8 +15,8 @@ EC2, Nginx, 영속 DB·파일 저장소, HTTPS, 로그와 백업을 실제 배�
 
 | 항목 | AWS QA 값 |
 | --- | --- |
-| `FRONTEND_URL` | `https://qa.example.com` |
-| `VITE_PUBLIC_SITE_URL` | `https://qa.example.com` |
+| `FRONTEND_URL` | `https://qa.totaskflow.com` |
+| `VITE_PUBLIC_SITE_URL` | `https://qa.totaskflow.com` |
 | `AUTH_SECURE_COOKIE` | `true` |
 | `SERVER_FORWARD_HEADERS_STRATEGY` | `framework` |
 | `SPRING_DATASOURCE_URL` | QA 전용 MySQL/RDS TLS 연결 |

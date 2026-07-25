@@ -24,9 +24,9 @@
 루트 `.env`에 실제 HTTPS 도메인과 개인정보 문의 주소를 넣는다.
 
 ```properties
-VITE_PUBLIC_SITE_URL=https://example.com
+VITE_PUBLIC_SITE_URL=https://totaskflow.com
 VITE_ALLOW_INDEXING=true
-VITE_PRIVACY_CONTACT=privacy@example.com
+VITE_PRIVACY_CONTACT=ghrud8835@gmail.com
 VITE_GOOGLE_SITE_VERIFICATION=google이_제공한_HTML_태그의_content_값
 ```
 
@@ -51,16 +51,16 @@ location / { try_files $uri $uri/ /index.html; }
 
 배포 후 다음 주소를 시크릿 창에서 확인한다.
 
-- `https://example.com/`
-- `https://example.com/robots.txt`
-- `https://example.com/sitemap.xml`
-- `https://example.com/privacy`
-- `https://example.com/terms`
-- `https://example.com/site-map`
-- `https://example.com/product`
-- `https://example.com/b2b`
-- `https://example.com/pricing`
-- `https://example.com/contact`
+- `https://totaskflow.com/`
+- `https://totaskflow.com/robots.txt`
+- `https://totaskflow.com/sitemap.xml`
+- `https://totaskflow.com/privacy`
+- `https://totaskflow.com/terms`
+- `https://totaskflow.com/site-map`
+- `https://totaskflow.com/product`
+- `https://totaskflow.com/b2b`
+- `https://totaskflow.com/pricing`
+- `https://totaskflow.com/contact`
 
 ## Search Console 등록 순서
 

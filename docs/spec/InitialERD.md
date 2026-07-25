@@ -149,6 +149,7 @@ erDiagram
 |---|---|---|
 | `users` | 계정과 시스템 권한 | username/email 각각 unique |
 | `social_accounts` | OAuth 제공자 계정 연결 | provider + provider_subject unique |
+| `oauth_signup_requests` | 동의 전 신규 OAuth 가입 요청(10분 만료, 원문 토큰 미저장) | token_hash unique |
 | `one_time_tokens` | 가입 인증·비밀번호 복구 | 토큰 원문 미저장, hash와 만료/사용 시각 저장 |
 | `refresh_tokens` | 회전식 로그인 세션 | token_hash unique, 폐기 시각 저장 |
 

@@ -4,8 +4,8 @@
 
 | 변수 | 1 로컬 | 2 ngrok | 3 AWS QA | 4 도메인 사전 | 5 운영 |
 | --- | --- | --- | --- | --- | --- |
-| `FRONTEND_URL` | localhost | ngrok HTTPS | QA HTTPS | 실제 테스트 origin | 운영 origin |
-| `VITE_PUBLIC_SITE_URL` | localhost | ngrok HTTPS | QA HTTPS | 실제 테스트 origin | 운영 origin |
+| `FRONTEND_URL` | localhost | ngrok HTTPS | `https://qa.totaskflow.com` | `https://totaskflow.com` 또는 staging | `https://totaskflow.com` |
+| `VITE_PUBLIC_SITE_URL` | localhost | ngrok HTTPS | `https://qa.totaskflow.com` | `https://totaskflow.com` 또는 staging | `https://totaskflow.com` |
 | `VITE_ALLOW_INDEXING` | false | false | false | false | true |
 | `AUTH_SECURE_COOKIE` | false | true | true | true | true |
 | `SERVER_FORWARD_HEADERS_STRATEGY` | 기본 | framework | framework | framework | framework |
@@ -14,7 +14,7 @@
 | `JWT_SECRET` | 로컬 전용 | 로컬 전용 | QA secret | 사전 secret | 운영 secret |
 | `MAIL_ENABLED` | false | 선택 | QA | true | true |
 | `MAIL_FROM` | local | 테스트 | QA 주소 | 실제 도메인 | 운영 주소 |
-| OAuth key | disabled/개발 | 개발 | QA 앱 | 운영 후보 앱 | 운영 앱 |
+| OAuth key | 자리표시자/로컬 앱 | 개발 앱 | QA 앱 | 운영 후보 앱 | 운영 앱 |
 | `UPLOAD_LOCAL_ROOT` | 로컬 | 로컬 | QA EBS | 사전 저장소 | 운영 저장소 |
 | Toss key | 테스트 | 테스트 | 테스트 | 운영상점 테스트 | 운영 |
 | `PAYMENT_ENCRYPTION_KEY_BASE64` | 로컬 | 로컬 | QA | 사전 | 운영 전용 |

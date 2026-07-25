@@ -8,7 +8,7 @@
 
 ## EC2 + Nginx
 
-- 업로드 경로는 배포 파일과 분리한 영속 디렉터리(예: 마운트된 EBS의 `/srv/work-task-flow/uploads`)로 설정합니다.
+- 업로드 경로는 배포 파일과 분리한 영속 디렉터리(예: 마운트된 EBS의 `/srv/totaskflow/uploads`)로 설정합니다.
 - 애플리케이션 실행 계정에만 읽기/쓰기 권한을 줍니다.
 - Nginx가 `/uploads`를 정적 공개하지 않도록 합니다. 현재 권한 검사를 유지하려면 `/uploads/` 요청도 Spring 서버로 프록시합니다.
 - `client_max_body_size 6m;`를 설정합니다.

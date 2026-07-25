@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RefreshCookieService {
+    // Keep the existing cookie name so deployed sessions survive the product rename.
     public static final String NAME = "team_refresh_token";
     private final boolean secure;
     private final RefreshTokenService tokens;

@@ -2,12 +2,15 @@ import { request, serviceUrl } from './client';
 
 export type TokenResponse = { accessToken: string; tokenType: string; expiresIn: number };
 export type ProviderResponse = { google: boolean; kakao: boolean };
-export type MeResponse = { userId: number; username: string; email: string; name: string; role: string };
-export type SignupRequest = {
-  username: string; email: string; name: string; password: string; verificationCode: string;
+export type OAuthSignupStatus = { provider: string; email: string; name: string; expiresAt: string };
+export type ConsentRequest = {
   termsAgreed: boolean; privacyAgreed: boolean; ageConfirmed: boolean;
   notificationAgreed: boolean; marketingAgreed: boolean;
 };
+export type MeResponse = { userId: number; username: string; email: string; name: string; role: string };
+export type SignupRequest = {
+  username: string; email: string; name: string; password: string; verificationCode: string;
+} & ConsentRequest;
 
 export const authApi = {
   sendVerification: (email: string) =>
@@ -29,6 +32,10 @@ export const authApi = {
       method: 'POST', body: JSON.stringify({ email, token, newPassword }),
     }),
   providers: () => request<ProviderResponse>('/auth/providers'),
+  oauthSignupStatus: () => request<OAuthSignupStatus>('/auth/oauth-signup'),
+  completeOAuthSignup: (body: ConsentRequest) =>
+    request<TokenResponse>('/auth/oauth-signup/complete', { method: 'POST', body: JSON.stringify(body) }),
+  cancelOAuthSignup: () => request<void>('/auth/oauth-signup', { method: 'DELETE' }),
   me: () => request<MeResponse>('/auth/me', {}, true),
   socialUrl: (provider: 'google' | 'kakao') => serviceUrl(`/oauth2/authorization/${provider}`),
 };

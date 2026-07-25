@@ -8,10 +8,10 @@
 
 | 항목 | 사전 서비스 값 |
 | --- | --- |
-| DNS | 실제 도메인 또는 `staging.example.com` |
+| DNS | `totaskflow.com` 또는 내부 검수용 `staging.totaskflow.com` |
 | TLS | 실제 인증서와 자동 갱신 |
-| `FRONTEND_URL` | 실제 테스트 origin |
-| `VITE_PUBLIC_SITE_URL` | 같은 HTTPS origin |
+| `FRONTEND_URL` | `https://totaskflow.com` 또는 검수용 HTTPS origin |
+| `VITE_PUBLIC_SITE_URL` | `https://totaskflow.com` 또는 같은 검수 origin |
 | `AUTH_SECURE_COOKIE` | `true` |
 | `MAIL_*` | 실제 도메인 발송 주소, SPF/DKIM/DMARC 확인 |
 | OAuth | 운영용 앱과 정확한 Redirect URI |

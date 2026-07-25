@@ -1,4 +1,4 @@
-const CACHE_NAME = 'work-task-flow-shell-v4';
+const CACHE_NAME = 'totaskflow-shell-v4';
 const APP_SHELL = ['/', '/app', '/manifest.webmanifest', '/icons/app-icon.svg'];
 
 self.addEventListener('install', (event) => {

@@ -81,7 +81,7 @@ function seoFilesPlugin(siteUrl: string, verification: string, allowIndexing: bo
     '',
   ].join('\n');
   return {
-    name: 'work-task-flow-seo-files',
+    name: 'totaskflow-seo-files',
     transformIndexHtml(html) {
       const transformed = allowIndexing
         ? html.replace('<meta name="robots" content="noindex,nofollow" />', '<meta name="robots" content="index,follow" />')

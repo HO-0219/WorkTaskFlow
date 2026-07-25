@@ -3,7 +3,7 @@ export function BrandMark({ className = '' }: { className?: string }) {
     className={className}
     viewBox="0 0 48 48"
     role="img"
-    aria-label="Work Task Flow"
+    aria-label="ToTaskFlow"
   >
     <path d="M13 14h16c5 0 8 3 8 8s-3 8-8 8H19" />
     <path d="m24 25-6 5 6 5" />

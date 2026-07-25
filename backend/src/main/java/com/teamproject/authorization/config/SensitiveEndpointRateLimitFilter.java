@@ -37,6 +37,7 @@ public class SensitiveEndpointRateLimitFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return !path.equals("/api/v1/auth/login")
                 && !path.equals("/api/v1/auth/demo-session")
+                && !path.equals("/api/v1/auth/oauth-signup/complete")
                 && !path.equals("/api/v1/groups/join")
                 && !path.startsWith("/api/v1/payments")
                 && !path.startsWith("/api/v1/auth/password-resets")

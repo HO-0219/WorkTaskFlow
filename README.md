@@ -1,4 +1,4 @@
-# Work Task Flow 로컬 MVP
+# ToTaskFlow 로컬 MVP
 
 로컬 MySQL을 기준으로 인증, 그룹·멤버십, 업무, 협업 알림, 캘린더와 대시보드를 제공하는 팀 프로젝트 MVP입니다.
 
@@ -8,6 +8,7 @@
 결제 테스트와 비밀키 운영은 [`docs/payment/TossPaymentsIntegration.md`](./docs/payment/TossPaymentsIntegration.md),
 이미지 저장·EC2 전환 기준은 [`docs/deployment/ImageStorage.md`](./docs/deployment/ImageStorage.md),
 공개 사이트 구조와 검색 등록은 [`docs/deployment/SearchConsole.md`](./docs/deployment/SearchConsole.md)를 따릅니다.
+Google 가입·로그인 설정은 [`docs/deployment/GoogleOAuth.md`](./docs/deployment/GoogleOAuth.md)를 따릅니다.
 
 ## 포함 기능
 
@@ -17,7 +18,7 @@
 - 비밀번호 찾기(일회용 재설정 링크)
 - JWT access token + 회전식 HttpOnly refresh token
 - 로그아웃과 현재 사용자 조회
-- Google/Kakao OAuth2 설정 및 신규 소셜 회원 생성
+- Google OAuth 2.0 로그인과 별도 동의 후 신규 소셜 회원 생성
 - React 인증 화면과 로그인 확인용 첫 화면
 - 로컬 MySQL 기반 개발 환경(Docker 전환은 후속 인프라 단계)
 - Flyway 기반 DB 스키마 버전 관리와 Hibernate 검증
@@ -151,7 +152,7 @@ Gmail은 일반 비밀번호가 아니라 앱 비밀번호를 사용하세요.
 
 ## DB 마이그레이션
 
-인증 스키마의 기준선은 V1, 사용자 프로필·탈퇴는 V2~V3, 그룹·초대는 V4~V5, 업무·체크리스트·댓글·멘션은 V6~V9, 알림은 V10, 캘린더는 V11, 대시보드 조회 인덱스는 V12에서 관리한다. V4는 기존 사용자의 PERSONAL 그룹도 보충한다. 새 로컬 MySQL DB에서는 Flyway가 순서대로 스키마를 만든 뒤 Hibernate가 엔티티와 스키마를 `validate`한다.
+인증 스키마의 기준선은 V1, 사용자 프로필·탈퇴는 V2~V3, 그룹·초대는 V4~V5, 업무·체크리스트·댓글·멘션은 V6~V9, 알림은 V10, 캘린더는 V11부터 확장하고 Google 동의 전 가입 요청은 V22에서 관리한다. V4는 기존 사용자의 PERSONAL 그룹도 보충한다. 새 로컬 MySQL DB에서는 Flyway가 순서대로 스키마를 만든 뒤 Hibernate가 엔티티와 스키마를 `validate`한다.
 
 업무는 그룹 상세의 `업무 목록·등록`에서 테스트할 수 있다. PERSONAL 그룹 업무는 생성 즉시 `TODO`이면서 요청자가 담당자가 되고, TEAM 그룹 업무는 담당자 없이 `REQUESTED`로 시작한다. 업무 상세에서는 권한이 있는 사용자가 내용과 마감일을 수정하고, 팀장이 승인·반려·담당자 지정을 하며 담당자가 시작·보류·재개·완료할 수 있다. 상태 이력은 시간순으로 표시된다. 체크리스트는 모든 활성 멤버가 조회하고 담당자 또는 팀장이 미종료 업무에서 추가·수정·완료·삭제할 수 있다. 댓글은 모든 활성 멤버가 업무 상태와 관계없이 작성하고 작성자만 수정·소프트 삭제할 수 있으며, 같은 그룹의 활성 멤버를 선택해 멘션할 수 있다.
 
@@ -168,21 +169,18 @@ cd backend
 
 ## 소셜 로그인 설정
 
-환경변수에 클라이언트 키를 넣으면 로그인 화면의 버튼이 활성화됩니다.
+`.env.example`의 자리표시자를 실제 비밀 저장소의 값으로 교체하면 로그인 화면의 Google 버튼이 활성화됩니다.
 
 ```properties
-OAUTH2_GOOGLE_CLIENT_ID=...
-OAUTH2_GOOGLE_CLIENT_SECRET=...
-OAUTH2_KAKAO_CLIENT_ID=...
-OAUTH2_KAKAO_CLIENT_SECRET=...
+OAUTH2_GOOGLE_CLIENT_ID=실제_클라이언트_ID
+OAUTH2_GOOGLE_CLIENT_SECRET=실제_클라이언트_보안_비밀
 ```
 
 개발자 콘솔의 Redirect URI:
 
-- Google: `http://localhost:8081/login/oauth2/code/google`
-- Kakao: `http://localhost:8081/login/oauth2/code/kakao`
+- Google: `http://localhost:5174/login/oauth2/code/google`
 
-Kakao 동의 항목에서 닉네임과 이메일을 허용해야 합니다. 운영 배포 시 백엔드 도메인으로 Redirect URI를 바꾸고 `FRONTEND_URL`, `AUTH_SECURE_COOKIE=true`, 강한 `JWT_SECRET`을 반드시 설정하세요.
+신규 Google 사용자는 인증 직후 계정을 만들지 않고 별도 동의 화면을 거칩니다. 운영 배포 시 `https://totaskflow.com/login/oauth2/code/google`을 정확히 등록하고 `FRONTEND_URL`, `AUTH_SECURE_COOKIE=true`, 강한 `JWT_SECRET`을 반드시 설정하세요. 전체 설정은 [`docs/deployment/GoogleOAuth.md`](./docs/deployment/GoogleOAuth.md)를 참고하세요.
 
 ## 후속 인프라 단계
 

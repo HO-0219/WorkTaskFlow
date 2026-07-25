@@ -27,8 +27,8 @@
 
 | 항목 | 실제 운영 값 |
 | --- | --- |
-| `FRONTEND_URL` | 운영 HTTPS origin |
-| `VITE_PUBLIC_SITE_URL` | 운영 HTTPS origin |
+| `FRONTEND_URL` | `https://totaskflow.com` |
+| `VITE_PUBLIC_SITE_URL` | `https://totaskflow.com` |
 | `AUTH_SECURE_COOKIE` | `true` |
 | DB | 운영 전용 암호화 RDS/MySQL, TLS, 자동 백업 |
 | 업로드 | 운영 전용 암호화 저장소와 백업 |

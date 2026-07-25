@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { OAuthCallbackPage } from '../features/auth/pages/OAuthCallbackPage';
+import { OAuthConsentPage } from '../features/auth/pages/OAuthConsentPage';
 import { LoginPage } from '../features/auth/pages/LoginPage';
 import { FindUsernamePage, ForgotPasswordPage, ResetPasswordPage } from '../features/auth/pages/RecoveryPages';
 import { SignupPage } from '../features/auth/pages/SignupPage';
@@ -55,6 +56,7 @@ export default function App() {
     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
     <Route path="/reset-password" element={<ResetPasswordPage />} />
     <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+    <Route path="/oauth/consent" element={<OAuthConsentPage />} />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes></div>
     <PwaStatus />
@@ -78,15 +80,16 @@ function RouteAnnouncer() {
 
 function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (language === 'en') {
-    if (pathname === '/') return 'Work Task Flow'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts';
+    if (pathname === '/') return 'ToTaskFlow'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts';
     if (pathname === '/groups') return 'Groups'; if (pathname === '/profile') return 'Profile'; if (pathname === '/account') return 'Account settings';
     if (pathname === '/payments') return 'Payments';
     if (pathname === '/product') return 'Product'; if (pathname === '/b2b') return 'B2B solutions'; if (pathname === '/pricing') return 'Pricing'; if (pathname === '/contact') return 'Contact';
     if (/\/dashboard$/.test(pathname)) return 'Group dashboard'; if (/\/tasks$/.test(pathname)) return 'Tasks'; if (/^\/tasks\//.test(pathname)) return 'Task details';
     if (/^\/groups\/\d+$/.test(pathname)) return 'Group settings'; if (pathname === '/signup') return 'Sign up'; if (pathname === '/login') return 'Log in';
     if (pathname === '/find-username') return 'Find username'; if (pathname === '/forgot-password' || pathname === '/reset-password') return 'Reset password';
+    if (pathname === '/oauth/consent') return 'Google sign-up consent';
   }
-  if (pathname === '/') return 'Work Task Flow';
+  if (pathname === '/') return 'ToTaskFlow';
   if (pathname === '/app') return '내 대시보드';
   if (pathname === '/calendar') return '캘린더';
   if (pathname === '/notifications') return '알림';
@@ -101,5 +104,6 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (pathname === '/product') return '제품'; if (pathname === '/b2b') return 'B2B 솔루션'; if (pathname === '/pricing') return '가격'; if (pathname === '/contact') return '문의';
   if (pathname === '/signup') return '회원가입';
   if (pathname === '/login') return '로그인';
-  return 'Work Task Flow';
+  if (pathname === '/oauth/consent') return 'Google 가입 동의';
+  return 'ToTaskFlow';
 }

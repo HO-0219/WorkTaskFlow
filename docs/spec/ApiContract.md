@@ -1,6 +1,6 @@
 # API 계약 기준선
 
-상태: 로컬 알파 API 구현 계약(Flyway V12 기준)
+상태: 로컬 알파 API 구현 계약(Flyway V22 기준)
 
 ## 공통 규칙
 
@@ -50,9 +50,14 @@
 | POST | `/auth/password-resets` | X | 204 | 재설정 요청 |
 | POST | `/auth/password-resets/confirm` | X | 204 | 새 비밀번호 저장 |
 | GET | `/auth/providers` | X | 200 | 활성 OAuth 제공자 |
+| GET | `/auth/oauth-signup` | 일회성 Cookie | 200 | 신규 Google 가입 정보·만료 시각 확인 |
+| POST | `/auth/oauth-signup/complete` | 일회성 Cookie | 200 | 필수·선택 동의 저장 후 계정 생성과 로그인 |
+| DELETE | `/auth/oauth-signup` | 선택 | 204 | 신규 Google 가입 취소와 일회성 cookie 삭제 |
 | GET | `/auth/me` | O | 200 | 현재 사용자 |
 
 현재 경로·JSON 필드·성공 코드는 인증 안정화가 끝날 때까지 호환성을 유지한다. REST 의미를 다듬어야 하면 버전 변경 또는 명시적 마이그레이션으로 처리한다.
+
+신규 Google 인증 성공 시 계정을 바로 만들지 않는다. 서버는 10분 만료 난수 토큰의 SHA-256 해시와 최소 프로필을 `oauth_signup_requests`에 저장하고, 원문은 `HttpOnly`, `SameSite=Lax` cookie로만 전달한다. `POST /auth/oauth-signup/complete`는 `termsAgreed`, `privacyAgreed`, `ageConfirmed`가 `true`인지 검증하고 `notificationAgreed`, `marketingAgreed`를 각각 기록한 뒤 사용자·개인 그룹·소셜 연결을 생성한다. 완료·취소·만료된 요청은 다시 사용할 수 없다.
 
 ## Phase 1 사용자 API
 
