@@ -299,8 +299,9 @@ jobs:
 
             certificate_exists() {
               sudo docker compose --env-file runtime.env.current -f compose.yml \
-                run --rm --entrypoint sh certbot \
-                -c "test -f /etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem"
+                run --rm --no-TTY --entrypoint sh certbot \
+                -c "test -f /etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem" \
+                </dev/null
             }
 
             if certificate_exists; then
@@ -313,14 +314,16 @@ jobs:
             sudo docker compose --env-file runtime.env.current -f compose.yml up -d --remove-orphans
 
             if ! certificate_exists; then
-              sudo docker compose --env-file runtime.env.current -f compose.yml run --rm certbot \
+              sudo docker compose --env-file runtime.env.current -f compose.yml run --rm --no-TTY certbot \
                 certonly --webroot --webroot-path /var/www/certbot \
                 --non-interactive --agree-tos --no-eff-email \
                 --email "$TLS_EMAIL" \
-                -d "$DOMAIN_NAME" -d "www.${DOMAIN_NAME}"
+                -d "$DOMAIN_NAME" -d "www.${DOMAIN_NAME}" \
+                </dev/null
             else
-              sudo docker compose --env-file runtime.env.current -f compose.yml run --rm certbot \
-                renew --quiet
+              sudo docker compose --env-file runtime.env.current -f compose.yml run --rm --no-TTY certbot \
+                renew --quiet \
+                </dev/null
             fi
 
             cp nginx-https.conf.template nginx-active.conf.template
