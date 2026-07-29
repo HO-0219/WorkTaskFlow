@@ -45,7 +45,7 @@ export function OAuthConsentPage() {
     setPending(true); setError('');
     try {
       const tokens = await authApi.completeOAuthSignup(consents);
-      accessToken.set(tokens.accessToken);
+      accessToken.set(tokens.accessToken, tokens.expiresIn);
       sessionMode.clear();
       navigate('/app', { replace: true });
     } catch (caught) {

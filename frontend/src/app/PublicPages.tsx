@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { BrandMark } from './BrandMark';
 import { useLanguage } from './LanguageContext';
 
-const policyVersion = '2026-07-25-v2';
+const policyVersion = '2026-07-27-v3';
 const privacyContact = String(import.meta.env.VITE_PRIVACY_CONTACT ?? 'ghrud8835@gmail.com');
 
 function PublicHeader() {
@@ -16,7 +16,7 @@ function PublicHeader() {
 
 function PublicLayout({ eyebrow, title, intro, policy = false, children }: { eyebrow: string; title: string; intro: string; policy?: boolean; children: React.ReactNode }) {
   const { t } = useLanguage();
-  return <main className="public-page"><PublicHeader /><article><span>{eyebrow}</span><h1>{title}</h1><p className="public-intro">{intro}</p>{children}{policy && <p className="policy-version">{t('시행일·버전', 'Effective date · version')}: {policyVersion}</p>}</article><footer><Link to="/product">{t('제품', 'Product')}</Link><Link to="/pricing">{t('가격', 'Pricing')}</Link><Link to="/contact">{t('문의', 'Contact')}</Link><Link to="/privacy">{t('개인정보 처리방침', 'Privacy')}</Link><Link to="/terms">{t('이용약관', 'Terms')}</Link><Link to="/site-map">{t('사이트맵', 'Site map')}</Link></footer></main>;
+  return <main className="public-page"><PublicHeader /><article><span>{eyebrow}</span><h1>{title}</h1><p className="public-intro">{intro}</p>{children}{policy && <p className="policy-version">{t('시행일·버전', 'Effective date · version')}: {policyVersion}</p>}</article><footer><Link to="/product">{t('제품', 'Product')}</Link><Link to="/pricing">{t('가격', 'Pricing')}</Link><Link to="/contact">{t('문의', 'Contact')}</Link><Link to="/privacy">{t('개인정보 처리방침', 'Privacy')}</Link><Link to="/terms">{t('이용약관', 'Terms')}</Link><Link to="/paid-terms">{t('유료서비스 약관', 'Paid terms')}</Link><Link to="/refund-policy">{t('환불 정책', 'Refunds')}</Link><Link to="/site-map">{t('사이트맵', 'Site map')}</Link></footer></main>;
 }
 
 export function ProductPage() {
@@ -54,9 +54,9 @@ export function B2BPage() {
 
 export function PricingPage() {
   const { t } = useLanguage();
-  return <PublicLayout eyebrow="PRICING" title={t('지금은 무료 베타로 시작하세요.', 'Start with the free beta.')} intro={t('실제 유료 판매 전까지 핵심 협업 기능을 무료 베타로 제공합니다. 운영 플랜과 가격은 사업자·결제 운영 준비 후 확정합니다.', 'Core collaboration features are available during the free beta. Production plans and pricing will be finalized after business and payment readiness.')}>
-    <div className="pricing-grid"><article><span>BETA</span><h2>{t('무료', 'Free')}</h2><strong>₩0</strong><p>{t('개인·팀 그룹, 업무 흐름, 댓글, 알림, 캘린더와 데모 체험', 'Personal and team groups, task workflows, comments, alerts, calendar, and demo')}</p><Link to="/login">{t('무료로 시작', 'Get started')}</Link></article><article><span>B2B</span><h2>{t('팀 도입', 'Team rollout')}</h2><strong>{t('문의', 'Contact')}</strong><p>{t('인원·보안·운영 지원 범위를 확인한 뒤 도입 방식을 협의합니다.', 'We scope rollout options based on team size, security, and support needs.')}</p><Link to="/contact">{t('도입 문의', 'Contact sales')}</Link></article></div>
-    <aside className="policy-notice">{t('유료 플랜은 아직 판매하지 않습니다. 가격, 환불과 과금 기준은 실제 운영 전에 별도로 고지합니다.', 'Paid plans are not yet sold. Pricing, refunds, and billing terms will be published before commercial launch.')}</aside>
+  return <PublicLayout eyebrow="PRICING" title={t('필요한 기능으로 바로 시작하세요.', 'Start with the features you need.')} intro={t('핵심 협업 기능은 무료로 제공하며, 유료 그룹 기능은 결제 운영 승인 후 별도로 안내합니다.', 'Core collaboration features are free. Paid group features will be announced separately after payment operations are approved.')}>
+    <div className="pricing-grid"><article><span>FREE</span><h2>{t('무료', 'Free')}</h2><strong>₩0</strong><p>{t('업무 흐름, 댓글, 알림, 캘린더와 한국어·영어 기본 리포트를 제공합니다.', 'Task workflows, comments, alerts, calendar, and core Korean/English reports are included.')}</p><Link to="/login">{t('무료로 시작', 'Get started')}</Link></article><article><span>PAID PREVIEW</span><h2>{t('유료 그룹', 'Paid group')}</h2><strong>{t('월 9,900원 예정', 'Planned at ₩9,900/mo')}</strong><p>{t('30일 체험과 선택 요일의 주간·월간 메일 리포트를 준비했습니다. 결제 운영 승인 전에는 실제 과금하지 않으며 AI 분석은 비활성입니다.', 'A 30-day trial and weekly/monthly scheduled email reports are ready. No live charge occurs before payment operations are approved, and AI analysis remains disabled.')}</p><Link to="/paid-terms">{t('유료서비스 기준 보기', 'View paid terms')}</Link></article><article><span>B2B</span><h2>{t('팀 도입', 'Team rollout')}</h2><strong>{t('문의', 'Contact')}</strong><p>{t('인원·보안·운영 지원 범위를 확인한 뒤 도입 방식을 협의합니다.', 'We scope rollout options based on team size, security, and support needs.')}</p><Link to="/contact">{t('도입 문의', 'Contact sales')}</Link></article></div>
+    <aside className="policy-notice">{t('유료 플랜은 아직 판매하지 않습니다. 판매 전 가격과 시행일을 다시 고지하며, 유료서비스 약관과 환불 정책을 확인할 수 있습니다.', 'Paid plans are not yet sold. Price and effective date will be announced again before launch; paid terms and refund policy are available now.')} <Link to="/refund-policy">{t('환불 정책', 'Refund policy')} →</Link></aside>
   </PublicLayout>;
 }
 
@@ -96,6 +96,30 @@ export function TermsPage() {
   </PublicLayout>;
 }
 
+export function PaidTermsPage() {
+  const { t } = useLanguage();
+  return <PublicLayout policy eyebrow="PAID TERMS" title={t('유료서비스 이용약관', 'Paid service terms')} intro={t('유료 전환 전 공개하는 운영 기준안입니다. 실제 판매는 사업자·통신판매업·결제 운영 준비와 법률 검토 후 시작합니다.', 'These are the operating terms published before paid rollout. Sales begin only after business, e-commerce, payment, and legal readiness.')}>
+    <PolicySection title={t('1. 그룹 구독', '1. Group subscription')}><p>{t('그룹 리더가 요금제, 결제수단, 자동 갱신과 해지를 관리합니다. 첫 결제 전에 금액·주기·자동 갱신·환불 정책에 개별 동의를 받습니다.', 'The group leader manages the plan, payment method, renewal, and cancellation. Price, cycle, renewal, and refund terms require explicit consent before the first charge.')}</p></PolicySection>
+    <PolicySection title={t('2. 무료 운영에서 유료 전환', '2. Free-to-paid rollout')}><p>{t('유료 전환일과 선택 기한을 사전 고지합니다. 무료 유지를 선택하거나 응답하지 않은 그룹에는 결제하지 않으며, 멤버십과 데이터를 일괄 삭제하지 않습니다.', 'We provide advance notice and a decision deadline. Groups that keep free or do not respond are not charged, and memberships and data are not bulk-deleted.')}</p></PolicySection>
+    <PolicySection title={t('3. 갱신과 해지', '3. Renewal and cancellation')}><p>{t('구독은 표시된 주기로 선불 갱신됩니다. 언제든 다음 갱신을 중단할 수 있고, 현재 결제기간 말일까지 이용할 수 있습니다.', 'Subscriptions renew in advance on the displayed cycle. Leaders can stop the next renewal at any time and retain access through the paid period.')}</p></PolicySection>
+    <PolicySection title={t('4. 리포트와 파일', '4. Reports and files')}><p>{t('기본 리포트는 확정 업무 지표로 생성합니다. AI 분석은 활성화되는 경우 보조 정보이며 중요한 판단 전 원자료를 확인해야 합니다. 업로드 자료는 이용자가 적법한 권한을 보유해야 합니다.', 'Core reports use confirmed work metrics. Any enabled AI analysis is supplementary and source data should be reviewed before important decisions. Uploaders must have rights to submitted files.')}</p></PolicySection>
+    <PolicySection title={t('5. 변경과 책임', '5. Changes and responsibility')}><p>{t('중요한 가격·조건 변경은 원칙적으로 30일 전에 고지합니다. 회사의 고의·중과실 및 법령상 배제할 수 없는 책임은 제한하지 않습니다.', 'Material price and term changes are generally announced 30 days in advance. Liability for intent, gross negligence, and non-waivable statutory rights is not excluded.')}</p></PolicySection>
+    <aside className="policy-notice">{t('사업자 정보와 최종 상품 한도는 운영 전에 입력해야 합니다. 상세 운영 원문은 고객센터에 요청할 수 있습니다.', 'Business identity and final plan limits must be inserted before launch. The complete operating text is available from support.')}</aside>
+  </PublicLayout>;
+}
+
+export function RefundPolicyPage() {
+  const { t } = useLanguage();
+  return <PublicLayout policy eyebrow="REFUNDS" title={t('환불 및 구독 해지 정책', 'Refund and cancellation policy')} intro={t('간단히 해지하고, 사용하지 않은 기간은 합리적으로 돌려받는 기준입니다.', 'A straightforward cancellation policy with fair refunds for unused time.')}>
+    <PolicySection title={t('1. 다음 결제 중단', '1. Stop renewal')}><p>{t('그룹 리더는 언제든 다음 자동결제를 중단할 수 있으며 현재 결제기간 말일까지 이용합니다.', 'The group leader may stop the next renewal at any time and retain access through the paid period.')}</p></PolicySection>
+    <PolicySection title={t('2. 첫 결제 7일', '2. First seven days')}><p>{t('첫 유료 결제일부터 7일 이내 요청하면 전액 환불합니다. 중복·부정·오결제도 확인 후 전액 환불합니다.', 'The first paid charge is fully refundable within seven days. Verified duplicate, unauthorized, or incorrect charges are fully refunded.')}</p></PolicySection>
+    <PolicySection title={t('3. 이후 중도 환불', '3. Later cancellation')}><p>{t('요청 다음 날부터 남은 완전한 일수를 결제기간 총 일수로 나누어 일할 환불하며 별도 위약금은 없습니다.', 'Afterward, we refund complete unused days pro rata from the day after the request, without a separate penalty.')}</p></PolicySection>
+    <PolicySection title={t('4. 하자와 처리기간', '4. Defects and timing')}><p>{t('중대한 서비스 하자는 복구·기간 연장 또는 전액/비례 환불로 처리합니다. 승인 후 3영업일 이내 취소·환급 절차를 시작합니다.', 'Material service defects are remedied, extended, or refunded fully/proportionally. We initiate an approved refund within three business days.')}</p></PolicySection>
+    <PolicySection title={t('5. 데이터 보호', '5. Data protection')}><p>{t('해지 후 무료 요금제로 전환하며 그룹 멤버십과 데이터를 즉시 삭제하지 않습니다. 관계 법령이 더 유리하면 법령을 우선합니다.', 'After cancellation the group moves to the free plan; memberships and data are not immediately deleted. More favorable statutory rights prevail.')}</p></PolicySection>
+    <aside className="policy-notice">{t('환불액 = 실제 결제금액 × 남은 완전한 일수 ÷ 결제기간 총 일수. 원 미만은 이용자에게 불리하지 않게 처리합니다.', 'Refund = amount paid × complete unused days ÷ total days in the billing period, rounded without disadvantaging the customer.')}</aside>
+  </PublicLayout>;
+}
+
 export function SiteMapPage() {
   const { t } = useLanguage();
   const sections = [
@@ -103,7 +127,7 @@ export function SiteMapPage() {
     { title: t('시작', 'Start'), links: [['/login', t('로그인·무료 시작', 'Log in · get started')], ['/signup', t('회원가입', 'Sign up')]] },
     { title: t('내 작업 공간', 'My workspace'), links: [['/app', t('내 대시보드', 'Dashboard')], ['/groups', t('그룹', 'Groups')], ['/calendar', t('캘린더', 'Calendar')], ['/notifications', t('알림', 'Alerts')]] },
     { title: t('계정', 'Account'), links: [['/profile', t('프로필', 'Profile')], ['/account', t('계정 및 보안', 'Account & security')], ['/payments', t('결제수단 및 테스트', 'Payments & tests')]] },
-    { title: t('정책과 안내', 'Policies'), links: [['/privacy', t('개인정보 처리방침', 'Privacy policy')], ['/terms', t('이용약관', 'Terms')], ['/site-map', t('사이트맵', 'Site map')]] },
+    { title: t('정책과 안내', 'Policies'), links: [['/privacy', t('개인정보 처리방침', 'Privacy policy')], ['/terms', t('이용약관', 'Terms')], ['/paid-terms', t('유료서비스 약관', 'Paid terms')], ['/refund-policy', t('환불 정책', 'Refund policy')], ['/site-map', t('사이트맵', 'Site map')]] },
   ];
   return <PublicLayout eyebrow="SITE MAP" title={t('전체 사이트맵', 'Site map')} intro={t('ToTaskFlow의 주요 화면과 정보 구조를 한눈에 확인하세요.', 'Explore the main screens and information structure of ToTaskFlow.')}>
     <div className="site-map-grid">{sections.map((section) => <section key={section.title}><h2>{section.title}</h2>{section.links.map(([to, label]) => <Link to={to} key={to}>{label}<span>→</span></Link>)}</section>)}</div>

@@ -186,7 +186,47 @@ class AuthSecurityApiTest {
 
         mvc.perform(post("/api/v1/auth/refresh").cookie(original))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_REUSED"));
+
+        mvc.perform(post("/api/v1/auth/refresh").cookie(rotated))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_REUSED"));
+    }
+
+    @Test
+    void pwaLoginUsesThirtyDaySlidingCookie() throws Exception {
+        signup("pwa_user", "pwa@example.com");
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .header("X-Client-Mode", "PWA")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"pwa_user\",\"password\":\"password123!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
+                        .contains("Max-Age=2592000"));
+    }
+
+    @Test
+    void logoutAllRevokesRefreshTokensAndExistingAccessTokensImmediately() throws Exception {
+        signup("all_logout_user", "all-logout@example.com");
+        var first = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"all_logout_user\",\"password\":\"password123!\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var second = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"all_logout_user\",\"password\":\"password123!\"}"))
+                .andExpect(status().isOk()).andReturn();
+        String firstAccess = objectMapper.readTree(first.getResponse().getContentAsString()).get("accessToken").asText();
+        String secondAccess = objectMapper.readTree(second.getResponse().getContentAsString()).get("accessToken").asText();
+        Cookie secondRefresh = cookie(second.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+
+        mvc.perform(post("/api/v1/auth/logout-all").header("Authorization", "Bearer " + firstAccess))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + secondAccess))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/auth/refresh").cookie(secondRefresh))
+                .andExpect(status().isUnauthorized());
     }
 
     private User signup(String username, String email) {

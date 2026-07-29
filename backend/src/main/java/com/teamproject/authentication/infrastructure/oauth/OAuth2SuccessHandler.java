@@ -14,6 +14,8 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Map;
+import com.teamproject.authentication.infrastructure.web.SessionDeviceResolver;
+import com.teamproject.authentication.domain.token.RefreshToken.ClientMode;
 
 @Component
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
@@ -22,11 +24,13 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final OAuthSignupCookieService signupCookies;
     private final OAuth2AuthorizedClientService authorizedClients;
     private final String frontendUrl;
+    private final SessionDeviceResolver devices;
     public OAuth2SuccessHandler(OAuthLoginService oauthLogin, RefreshCookieService cookies,
             OAuthSignupCookieService signupCookies, OAuth2AuthorizedClientService authorizedClients,
-            @Value("${app.frontend-url}") String frontendUrl) {
+            SessionDeviceResolver devices, @Value("${app.frontend-url}") String frontendUrl) {
         this.oauthLogin = oauthLogin; this.cookies = cookies; this.signupCookies = signupCookies;
         this.authorizedClients = authorizedClients; this.frontendUrl = frontendUrl;
+        this.devices = devices;
     }
     @Override public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException, ServletException {
@@ -35,12 +39,15 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         String provider = oauth.getAuthorizedClientRegistrationId();
         try {
             Profile profile = profile(provider, principal.getAttributes());
-            var result = oauthLogin.start(provider, profile.subject(), profile.email(), profile.name(), profile.emailVerified());
+            ClientMode mode = "PWA".equalsIgnoreCase(request.getParameter("client_mode"))
+                    ? ClientMode.PWA : ClientMode.WEB;
+            var result = oauthLogin.start(provider, profile.subject(), profile.email(), profile.name(),
+                    profile.emailVerified(), mode, devices.resolve(request));
             if (result.requiresConsent()) {
                 signupCookies.add(response, result.signupToken());
                 response.sendRedirect(frontendUrl + "/oauth/consent");
             } else {
-                cookies.add(response, result.tokens().refreshToken());
+                cookies.add(response, result.tokens().refreshToken(), result.tokens().refreshCookieMaxAgeSeconds());
                 response.sendRedirect(frontendUrl + "/oauth/callback");
             }
         } catch (RuntimeException e) {

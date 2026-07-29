@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { OAuthCallbackPage } from '../features/auth/pages/OAuthCallbackPage';
 import { OAuthConsentPage } from '../features/auth/pages/OAuthConsentPage';
 import { LoginPage } from '../features/auth/pages/LoginPage';
@@ -21,19 +21,26 @@ import { PwaStatus } from './PwaStatus';
 import { LanguageProvider } from './LanguageContext';
 import { useLanguage } from './LanguageContext';
 import { LandingPage } from './LandingPage';
-import { B2BPage, ContactPage, PricingPage, PrivacyPage, ProductPage, SiteMapPage, TermsPage } from './PublicPages';
+import { B2BPage, ContactPage, PaidTermsPage, PricingPage, PrivacyPage, ProductPage, RefundPolicyPage, SiteMapPage, TermsPage } from './PublicPages';
 import { PageMeta } from './PageMeta';
+import { isRunningStandalone } from './pwa';
+import { SessionKeepAlive } from './SessionKeepAlive';
+import { AdminPage } from '../features/admin/AdminPage';
 
 export default function App() {
   return <LanguageProvider><BrowserRouter>
     <SkipLink />
     <RouteAnnouncer />
+    <StandalonePublicGuard />
     <PageMeta />
+    <SessionKeepAlive />
     <div id="main-content" tabIndex={-1}><Routes>
     <Route path="/" element={<LandingPage />} />
     <Route path="/app" element={<HomePage />} />
     <Route path="/privacy" element={<PrivacyPage />} />
     <Route path="/terms" element={<TermsPage />} />
+    <Route path="/paid-terms" element={<PaidTermsPage />} />
+    <Route path="/refund-policy" element={<RefundPolicyPage />} />
     <Route path="/site-map" element={<SiteMapPage />} />
     <Route path="/product" element={<ProductPage />} />
     <Route path="/b2b" element={<B2BPage />} />
@@ -42,6 +49,7 @@ export default function App() {
     <Route path="/profile" element={<ProfilePage />} />
     <Route path="/account" element={<AccountPage />} />
     <Route path="/payments" element={<PaymentsPage />} />
+    <Route path="/admin" element={<AdminPage />} />
     <Route path="/groups" element={<GroupsPage />} />
     <Route path="/groups/:groupId" element={<GroupDetailPage />} />
     <Route path="/groups/:groupId/tasks" element={<TasksPage />} />
@@ -63,6 +71,19 @@ export default function App() {
   </BrowserRouter></LanguageProvider>;
 }
 
+function StandalonePublicGuard() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!isRunningStandalone()) return;
+    const publicOnly = new Set(['/', '/product', '/b2b', '/pricing', '/contact', '/site-map']);
+    if (publicOnly.has(location.pathname)) {
+      navigate('/app', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+  return null;
+}
+
 function SkipLink() {
   const { t } = useLanguage();
   return <a className="skip-link" href="#main-content">{t('본문으로 건너뛰기', 'Skip to main content')}</a>;
@@ -82,8 +103,9 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (language === 'en') {
     if (pathname === '/') return 'ToTaskFlow'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts';
     if (pathname === '/groups') return 'Groups'; if (pathname === '/profile') return 'Profile'; if (pathname === '/account') return 'Account settings';
-    if (pathname === '/payments') return 'Payments';
+    if (pathname === '/payments') return 'Payments'; if (pathname === '/admin') return 'Admin';
     if (pathname === '/product') return 'Product'; if (pathname === '/b2b') return 'B2B solutions'; if (pathname === '/pricing') return 'Pricing'; if (pathname === '/contact') return 'Contact';
+    if (pathname === '/paid-terms') return 'Paid service terms'; if (pathname === '/refund-policy') return 'Refund policy';
     if (/\/dashboard$/.test(pathname)) return 'Group dashboard'; if (/\/tasks$/.test(pathname)) return 'Tasks'; if (/^\/tasks\//.test(pathname)) return 'Task details';
     if (/^\/groups\/\d+$/.test(pathname)) return 'Group settings'; if (pathname === '/signup') return 'Sign up'; if (pathname === '/login') return 'Log in';
     if (pathname === '/find-username') return 'Find username'; if (pathname === '/forgot-password' || pathname === '/reset-password') return 'Reset password';
@@ -101,7 +123,9 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (pathname === '/profile') return '프로필';
   if (pathname === '/account') return '계정 설정';
   if (pathname === '/payments') return '결제 관리';
+  if (pathname === '/admin') return '운영자';
   if (pathname === '/product') return '제품'; if (pathname === '/b2b') return 'B2B 솔루션'; if (pathname === '/pricing') return '가격'; if (pathname === '/contact') return '문의';
+  if (pathname === '/paid-terms') return '유료서비스 이용약관'; if (pathname === '/refund-policy') return '환불 정책';
   if (pathname === '/signup') return '회원가입';
   if (pathname === '/login') return '로그인';
   if (pathname === '/oauth/consent') return 'Google 가입 동의';

@@ -10,7 +10,7 @@ export function OAuthCallbackPage() {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     authApi.refresh().then(token => {
-      accessToken.set(token.accessToken);
+      accessToken.set(token.accessToken, token.expiresIn);
       sessionMode.clear();
       navigate('/app');
     }).catch(() => setFailed(true));

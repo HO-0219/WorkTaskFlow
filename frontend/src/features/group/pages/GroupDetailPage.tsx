@@ -5,6 +5,8 @@ import { accessToken, errorMessage } from '../../../api/client';
 import { AppNavigation } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
 import { AuthenticatedImage } from '../../../app/AuthenticatedImage';
+import { ResourcePanel } from '../../resource/ResourcePanel';
+import { SubscriptionPanel } from '../../subscription/SubscriptionPanel';
 
 export function GroupDetailPage() {
   const { t, language } = useLanguage();
@@ -31,6 +33,7 @@ export function GroupDetailPage() {
   const [joinCodePending, setJoinCodePending] = useState(false);
   const [joinCodeCopied, setJoinCodeCopied] = useState(false);
   const [imagePending, setImagePending] = useState(false);
+  const [planPending, setPlanPending] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(groupId) || groupId < 1) {
@@ -77,11 +80,29 @@ export function GroupDetailPage() {
     setError('');
     try {
       setGroup(await groupApi.uploadImage(groupId, file));
+      window.dispatchEvent(new Event('groups:refresh'));
       setSaved(true);
     } catch (value) {
       setError(errorMessage(value));
     } finally {
       setImagePending(false);
+    }
+  }
+
+  async function switchTestPlan(plan: 'FREE' | 'PAID') {
+    const message = plan === 'PAID'
+      ? t('테스트 유료 그룹으로 전환할까요? 실제 결제나 청구는 발생하지 않습니다.', 'Switch to the paid test plan? No real payment or charge will occur.')
+      : t('무료 그룹으로 되돌릴까요? 테스트 이용 기간 정보가 초기화됩니다.', 'Return to the free plan? Test-period information will be cleared.');
+    if (!window.confirm(message)) return;
+    setPlanPending(true);
+    setError('');
+    try {
+      setGroup(await groupApi.switchTestPlan(groupId, plan));
+      window.dispatchEvent(new Event('groups:refresh'));
+    } catch (value) {
+      setError(errorMessage(value));
+    } finally {
+      setPlanPending(false);
     }
   }
 
@@ -252,7 +273,12 @@ export function GroupDetailPage() {
     {group && <nav className="group-primary-links" aria-label={t('그룹 바로가기', 'Group shortcuts')}>{group.type === 'PERSONAL' ? <Link className="secondary" to={`/calendar?groupId=${group.id}`}>{t('캘린더', 'Calendar')}</Link> : <><Link className="secondary" to={`/groups/${group.id}/dashboard`}>{t('대시보드', 'Dashboard')}</Link><Link className="secondary group-tasks-link" to={`/groups/${group.id}/tasks`}>{t('업무', 'Tasks')}</Link><Link className="secondary" to={`/calendar?groupId=${group.id}`}>{t('캘린더', 'Calendar')}</Link></>}</nav>}
     {group?.role === 'LEADER' ? <section className="group-settings-section"><header><h2>{t('기본 설정', 'Basic settings')}</h2><p>{t('이름, 설명과 그룹에서 사용할 기준 시간대를 관리합니다.', 'Manage the name, description, and default time zone.')}</p></header><form className="form" onSubmit={update}>
       <label className="field"><span>{group.type === 'PERSONAL' ? t('캘린더 이름', 'Calendar name') : t('그룹 이름', 'Group name')}</span><input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label className="field"><span>{t('그룹 아이콘', 'Group icon')}</span><input type="file" accept="image/jpeg,image/png,image/gif" disabled={imagePending} onChange={(event) => uploadGroupImage(event.target.files?.[0])} /><small className="field-help">{imagePending ? t('업로드 중...', 'Uploading...') : t('JPG, PNG, GIF · 최대 5MB', 'JPG, PNG, GIF · up to 5MB')}</small></label>
+      <div className="field"><span>{t('그룹 아이콘', 'Group icon')}</span><label className={`group-image-picker ${imagePending ? 'pending' : ''}`}>
+        <span className="group-image-picker-preview">{group.imageUrl ? <AuthenticatedImage src={group.imageUrl} alt="" /> : <b>{group.name.slice(0, 1)}</b>}</span>
+        <span><strong>{imagePending ? t('이미지를 업로드하고 있어요', 'Uploading image') : t('새 그룹 아이콘 선택', 'Choose a new group icon')}</strong><small>{t('목록과 좌측 사이드바에 바로 반영됩니다. JPG, PNG, GIF · 최대 5MB', 'Updates the group list and sidebar. JPG, PNG, GIF · up to 5MB')}</small></span>
+        <i aria-hidden="true">＋</i>
+        <input className="sr-only" type="file" accept="image/jpeg,image/png,image/gif" disabled={imagePending} onChange={(event) => uploadGroupImage(event.target.files?.[0])} />
+      </label></div>
       <label className="field"><span>{t('설명', 'Description')}</span><textarea maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       <label className="field"><span>{t('기준 시간대', 'Default time zone')}</span><select required value={timezone} onChange={(event) => setTimezone(event.target.value)}>{timezoneOptions.map((option) => <option value={option.value} key={option.value}>{t(option.label, option.en)}</option>)}</select><small className="field-help">{t('업무 마감과 캘린더 알림 계산에 사용됩니다.', 'Used to calculate task deadlines and calendar alerts.')}</small></label>
       {group.type === 'TEAM' && <label className="field"><span>{t('대시보드 공개 범위', 'Dashboard visibility')}</span><select value={visibility} onChange={(event) => setVisibility(event.target.value as 'LEADER_ONLY' | 'MEMBERS')}><option value="MEMBERS">{t('모든 팀원이 볼 수 있음', 'Visible to all members')}</option><option value="LEADER_ONLY">{t('팀장만 볼 수 있음', 'Leaders only')}</option></select></label>}
@@ -261,7 +287,20 @@ export function GroupDetailPage() {
     </form></section> : <section className="group-settings-section readonly-settings"><header><h2>{t('기본 정보', 'Basic information')}</h2><p>{t('설정 변경은 그룹 팀장만 할 수 있습니다.', 'Only group leaders can change settings.')}</p></header>
       <dl><div><dt>{t('설명', 'Description')}</dt><dd>{group?.description || t('설명 없음', 'No description')}</dd></div><div><dt>{t('시간대', 'Time zone')}</dt><dd>{group?.timezone}</dd></div><div><dt>{t('대시보드', 'Dashboard')}</dt><dd>{group?.dashboardVisibility === 'MEMBERS' ? t('모든 멤버', 'All members') : t('팀장만', 'Leaders only')}</dd></div></dl>
     </section>}
-    {group?.type === 'TEAM' && <section className="group-subsection membership-section"><header className="group-section-heading"><div><h2>{t('그룹 멤버십', 'Group membership')}</h2><p>{t('그룹에 적용되는 리포트 제공 범위입니다.', 'Report access available for this group.')}</p></div><span className={`membership-badge ${group.membershipPlan.toLowerCase()}`}>{group.membershipPlan === 'PAID' ? t('유료', 'Paid') : t('무료', 'Free')}</span></header>{group.membershipPlan === 'PAID' ? <div className="membership-benefits"><strong>{t('유료 그룹', 'Paid group')}</strong><p>{t('리포트 다운로드 제한 없음 · 월 리포트 월 1회 자동 PDF 메일 발송', 'Unlimited report downloads · Monthly PDF report by email')}</p><small>{t('AI 리포트 분석은 테스트 데이터 개발 후 연결 예정입니다.', 'AI report analysis will be connected after test data development.')}</small></div> : <div className="membership-benefits"><strong>{t('무료 그룹', 'Free group')}</strong><p>{t('AI 없이 저장된 업무 데이터로 기본 리포트를 제공합니다.', 'Basic reports are generated from stored task data without AI.')}</p><small>{t('그룹 리포트는 주 2회까지 생성할 수 있으며, 팀원 개인 리포트는 주간·월간·연간으로 제공됩니다.', 'Generate up to two group reports per week. Personal reports are available weekly, monthly, and yearly.')}</small></div>}</section>}
+    {group?.type === 'TEAM' && <section className={`group-subsection membership-section ${group.membershipPlan.toLowerCase()}`}><header className="group-section-heading"><div><span className="page-eyebrow">PLAN</span><h2>{t('그룹 멤버십', 'Group membership')}</h2><p>{t('기본 리포트는 모든 그룹에서 제한 없이 사용할 수 있습니다.', 'Core reports are unlimited for every group.')}</p></div><span className={`membership-badge ${group.membershipPlan.toLowerCase()}`}>{group.membershipPlan === 'PAID' ? t('유료 테스트', 'Paid test') : t('무료', 'Free')}</span></header>
+      <div className="membership-plan-layout"><div className="membership-benefits"><strong>{group.membershipPlan === 'PAID' ? t('유료 그룹 테스트 이용 중', 'Paid group test active') : t('무료 그룹', 'Free group')}</strong><ul>
+        <li>{t('주간·월간·연간, 내 업무·그룹 전체 PDF 리포트 제한 없음', 'Unlimited weekly, monthly, and yearly personal/group PDF reports')}</li>
+        <li>{t('업무·캘린더·댓글·멘션·알림의 전체 협업 흐름', 'Complete tasks, calendar, comments, mentions, and alerts')}</li>
+        <li>{group.membershipPlan === 'PAID' ? t('향후 OpenAI 분석·자동 메일 리포트 연결 대상', 'Ready for future OpenAI analysis and scheduled email reports') : t('AI 분석·자동 메일 리포트는 유료 기능으로 연결 예정', 'AI analysis and scheduled email reports are planned paid features')}</li>
+      </ul><small>{t('현재 유료 전환은 결제 없는 QA용 상태 변경입니다. 카드 등록이나 실제 청구가 발생하지 않습니다.', 'The current paid switch is QA-only. It does not register a card or create a real charge.')}</small></div>
+      <aside className="membership-period">{group.membershipPlan === 'PAID' ? <dl><div><dt>{t('테스트 시작일', 'Test started')}</dt><dd>{group.paidStartedAt ? formatDate(group.paidStartedAt, language) : '-'}</dd></div><div><dt>{t('이용 기간', 'Access period')}</dt><dd>{group.paidUntil ? t(`${formatDate(group.paidUntil, language)}까지`, `Until ${formatDate(group.paidUntil, language)}`) : '-'}</dd></div><div><dt>{t('다음 결제 예정일', 'Next billing date')}</dt><dd>{group.nextBillingAt ? formatDate(group.nextBillingAt, language) : '-'}</dd></div></dl> : <p>{t('필요할 때 테스트 유료 플랜으로 전환해 기간과 결제 예정일 표시를 검증할 수 있습니다.', 'Switch to the paid test plan to verify period and billing-date presentation.')}</p>}
+        {group.role === 'LEADER' && group.testPlanSwitchEnabled && <button className={group.membershipPlan === 'PAID' ? 'secondary' : 'primary'} type="button" disabled={planPending} onClick={() => switchTestPlan(group.membershipPlan === 'PAID' ? 'FREE' : 'PAID')}>{planPending ? t('전환 중...', 'Switching...') : group.membershipPlan === 'PAID' ? t('무료로 되돌리기', 'Return to free') : t('결제 없이 유료 그룹 체험', 'Try paid group without payment')}</button>}
+        {group.role === 'LEADER' && <Link className="membership-payment-link" to="/payments">{t('토스페이먼츠 결제 연동 테스트 확인', 'Open Toss Payments integration tests')} →</Link>}
+        {!group.testPlanSwitchEnabled && group.role === 'LEADER' && <small>{t('실제 서비스 환경에서는 결제 승인 완료 후에만 유료로 전환됩니다.', 'In production, paid status changes only after payment approval.')}</small>}
+      </aside></div>
+    </section>}
+    {group?.type === 'TEAM' && group.role === 'LEADER' && <SubscriptionPanel groupId={group.id} />}
+    {group?.type === 'TEAM' && <ResourcePanel groupId={group.id} />}
     {group && error && <p className="error group-global-error">{error}</p>}
     {!group && error && <p className="error">{error}</p>}
     {group && <section className="group-subsection"><header className="group-section-heading"><div><h2>{t('멤버', 'Members')}</h2><p>{t(`${memberList.length}명이 함께하고 있습니다.`, `${memberList.length} members`)}</p></div></header><div className="member-list">{memberList.map((member) => <div className="member-row" key={member.id}><span className="member-avatar">{member.profileImageUrl ? <AuthenticatedImage src={member.profileImageUrl} alt="" /> : member.nickname.slice(0, 1)}</span><div className="member-info"><strong>{member.nickname}{member.id === group.memberId ? t(' (나)', ' (me)') : ''}</strong><small>{member.role === 'LEADER' ? t('팀장', 'Leader') : t('팀원', 'Member')}</small></div>{group.type === 'TEAM' && group.role === 'LEADER' && <div className="member-actions"><select aria-label={t(`${member.nickname} 역할`, `${member.nickname} role`)} value={member.role} disabled={memberPending === member.id} onChange={(event) => changeRole(member, event.target.value as 'LEADER' | 'MEMBER')}><option value="LEADER">{t('팀장', 'Leader')}</option><option value="MEMBER">{t('팀원', 'Member')}</option></select>{member.id !== group.memberId && <button type="button" disabled={memberPending === member.id} onClick={() => removeMember(member)}>{t('내보내기', 'Remove')}</button>}</div>}</div>)}</div>{group.type === 'TEAM' && <button className="leave-group-button" type="button" disabled={memberPending === group.memberId} onClick={leaveGroup}>{t('그룹 탈퇴', 'Leave group')}</button>}</section>}

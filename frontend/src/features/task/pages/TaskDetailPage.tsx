@@ -6,6 +6,7 @@ import { groupApi, GroupResponse, MemberResponse } from '../../../api/groupApi';
 import { ChecklistItemResponse, ChecklistResponse, taskApi, TaskAction, TaskHistoryResponse, TaskResponse } from '../../../api/taskApi';
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
+import { ResourcePanel } from '../../resource/ResourcePanel';
 
 const statusLabels: Record<TaskResponse['status'], [string, string]> = {
   REQUESTED: ['승인 대기', 'Pending approval'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'],
@@ -323,6 +324,7 @@ export function TaskDetailPage() {
         onDelete={deleteComment}
         recordLocked={isTerminal(task.status)}
       />
+      <ResourcePanel groupId={task.groupId} taskId={task.id} />
       <section className="task-action-section"><h2>{t('상태 이력', 'Status history')}</h2><div className="task-history-list">{histories.map((history) => <div className="task-history-item" key={history.id}><span className="task-history-dot" /><div><strong>{history.fromStatus ? `${label(statusLabels[history.fromStatus])} → ` : ''}{label(statusLabels[history.toStatus])}</strong><small>{t(`멤버 #${history.changedByMemberId}`, `Member #${history.changedByMemberId}`)} · {formatDate(history.createdAt, language)}</small>{history.reason && <p>{history.reason}</p>}</div></div>)}</div></section>
     </>}
   </section>{reasonAction && <Modal title={label(actionLabels[reasonAction])} description={t('업무 이력에 남을 사유를 입력해 주세요.', 'Enter a reason to keep in the task history.')} onClose={() => { setReasonAction(undefined); setActionReason(''); setError(''); }}><form className="form modal-form" onSubmit={(event) => { event.preventDefault(); void performTransition(reasonAction, actionReason); }}><label className="field"><span>{t('사유', 'Reason')}</span><textarea autoFocus required maxLength={500} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder={t('팀원이 이해할 수 있도록 간단히 적어주세요.', 'Add a short explanation for the team.')} /></label>{error && <p className="error">{error}</p>}<div className="modal-actions"><button className="secondary" type="button" onClick={() => setReasonAction(undefined)}>{t('돌아가기', 'Back')}</button><button className="danger" disabled={pending || !actionReason.trim()}>{pending ? t('처리 중...', 'Processing...') : label(actionLabels[reasonAction])}</button></div></form></Modal>}</main></>;
