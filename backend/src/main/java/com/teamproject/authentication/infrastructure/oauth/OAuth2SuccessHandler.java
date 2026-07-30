@@ -10,8 +10,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Map;
 import com.teamproject.authentication.infrastructure.web.SessionDeviceResolver;
@@ -19,6 +22,7 @@ import com.teamproject.authentication.domain.token.RefreshToken.ClientMode;
 
 @Component
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
+    private static final Logger log = LoggerFactory.getLogger(OAuth2SuccessHandler.class);
     private final OAuthLoginService oauthLogin;
     private final RefreshCookieService cookies;
     private final OAuthSignupCookieService signupCookies;
@@ -51,9 +55,17 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 response.sendRedirect(frontendUrl + "/oauth/callback");
             }
         } catch (RuntimeException e) {
+            log.warn("OAuth2 login failed: provider={}, errorType={}",
+                    provider, e.getClass().getSimpleName(), e);
             response.sendRedirect(frontendUrl + "/login?socialError=SOCIAL_LOGIN_FAILED");
         } finally {
-            authorizedClients.removeAuthorizedClient(provider, oauth.getName());
+            try {
+                authorizedClients.removeAuthorizedClient(provider, oauth.getName());
+            } finally {
+                SecurityContextHolder.clearContext();
+                HttpSession session = request.getSession(false);
+                if (session != null) session.invalidate();
+            }
         }
     }
     @SuppressWarnings("unchecked")

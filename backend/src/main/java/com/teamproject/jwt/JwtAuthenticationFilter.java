@@ -27,7 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ") && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (header != null && header.startsWith("Bearer ")) {
             try {
                 var claims = jwtService.parse(header.substring(7));
                 Long userId = Long.valueOf(claims.getSubject());
@@ -40,6 +40,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         || sessionId == null
                         || !refreshTokens.existsBySessionIdAndRevokedAtIsNullAndExpiresAtAfterAndAbsoluteExpiresAtAfter(
                                 sessionId, now, now)) {
+                    SecurityContextHolder.clearContext();
                     chain.doFilter(request, response);
                     return;
                 }
@@ -53,6 +54,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (JwtException | IllegalArgumentException ignored) {
                 SecurityContextHolder.clearContext();
             }
+        } else if (request.getRequestURI().startsWith("/api/")) {
+            // OAuth2 uses a short-lived HTTP session only for its redirect handshake.
+            // Never let that OIDC principal authenticate application API requests.
+            SecurityContextHolder.clearContext();
         }
         chain.doFilter(request, response);
     }

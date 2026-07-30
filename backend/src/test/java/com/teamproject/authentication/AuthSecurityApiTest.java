@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 
 @SpringBootTest(classes = TeamProjectApplication.class)
 @AutoConfigureMockMvc
@@ -79,6 +80,27 @@ class AuthSecurityApiTest {
         JwtService expiredJwt = new JwtService(SECRET, -1);
         String expired = expiredJwt.create(user);
         assertThatThrownBy(() -> expiredJwt.parse(expired)).isInstanceOf(ExpiredJwtException.class);
+    }
+
+    @Test
+    void oauthHandshakePrincipalCannotReplaceApiJwtAuthentication() throws Exception {
+        signup("oauth_session_user", "oauth-session@example.com");
+        String response = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"oauth_session_user\",\"password\":\"password123!\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = objectMapper.readTree(response).get("accessToken").asText();
+
+        mvc.perform(get("/api/v1/auth/me").with(oauth2Login()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+        mvc.perform(get("/api/v1/auth/me")
+                        .with(oauth2Login())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("oauth_session_user"));
     }
 
     @Test
