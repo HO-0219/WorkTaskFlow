@@ -6,7 +6,6 @@ import { groupApi, type GroupResponse } from '../api/groupApi';
 import { accessToken, sessionMode } from '../api/client';
 import { authApi } from '../api/authApi';
 import { BrandMark } from './BrandMark';
-import { AuthenticatedImage } from './AuthenticatedImage';
 
 const items = [
   { to: '/app', label: '홈', icon: '⌂' },
@@ -22,7 +21,6 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
   const { language, setLanguage } = useLanguage();
   const [liveUnreadCount, setLiveUnreadCount] = useState(unreadCount ?? 0);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
-  const [groupsOpen, setGroupsOpen] = useState(pathname.startsWith('/groups'));
   useEffect(() => {
     if (!accessToken.get()) return;
     const refresh = () => notificationApi.list(1).then((page) => setLiveUnreadCount(page.unreadCount)).catch(() => undefined);
@@ -46,7 +44,6 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
   const selectedGroupId = pathGroupId ?? new URLSearchParams(search).get('groupId') ?? '';
   const labels = language === 'ko' ? ['홈', '그룹', '캘린더', '알림', '프로필'] : ['Home', 'Groups', 'Calendar', 'Alerts', 'Profile'];
   const teamGroups = groups.filter((group) => group.type === 'TEAM');
-  const currentGroup = groups.find((group) => String(group.id) === selectedGroupId);
   const demo = sessionMode.isDemo();
   async function exitDemo() {
     await authApi.logout().catch(() => undefined);
@@ -57,10 +54,13 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
   return <nav className="app-navigation" aria-label={language === 'ko' ? '주요 메뉴' : 'Main navigation'}>
     <Link className="app-navigation-brand" to="/app" aria-label={language === 'ko' ? 'ToTaskFlow 앱 홈' : 'ToTaskFlow app home'}><span><BrandMark /></span><strong>ToTaskFlow</strong></Link>
     {demo && <div className="demo-session-notice"><span>{language === 'ko' ? '읽기 전용 데모' : 'Read-only demo'}</span><button type="button" onClick={exitDemo}>{language === 'ko' ? '데모 종료·로그인' : 'Exit demo & log in'}</button></div>}
-    {groups.length > 0 && <label className="group-switcher"><span>{language === 'ko' ? '일정·그룹 전환' : 'Switch schedule or group'}</span>{currentGroup && <span className="group-switcher-current">{currentGroup.imageUrl ? <AuthenticatedImage src={currentGroup.imageUrl} alt="" /> : <b>{currentGroup.name.slice(0, 1)}</b>}<strong>{currentGroup.name}</strong></span>}<select value={selectedGroupId} onChange={(event) => { const group = groups.find((value) => value.id === Number(event.target.value)); if (!group) return; navigate(group.type === 'PERSONAL' ? `/calendar?groupId=${group.id}` : `/groups/${group.id}/dashboard`); }}><option value="">{language === 'ko' ? '일정 또는 그룹을 선택하세요' : 'Choose a schedule or group'}</option><optgroup label={language === 'ko' ? '개인 일정' : 'Personal schedule'}>{groups.filter((group) => group.type === 'PERSONAL').map((group) => <option value={group.id} key={group.id}>● {group.name}</option>)}</optgroup><optgroup label={language === 'ko' ? '팀 그룹' : 'Teams'}>{groups.filter((group) => group.type === 'TEAM').map((group) => <option value={group.id} key={group.id}>◆ {group.name}</option>)}</optgroup></select></label>}
+    {groups.length > 0 && <label className="group-switcher"><span>{language === 'ko' ? '공간 이동' : 'Switch workspace'}</span><select aria-label={language === 'ko' ? '이동할 공간 선택' : 'Choose a workspace'} value={selectedGroupId} onChange={(event) => {
+      const group = groups.find((value) => value.id === Number(event.target.value));
+      if (!group) { navigate('/groups'); return; }
+      navigate(group.type === 'PERSONAL' ? `/calendar?groupId=${group.id}` : `/groups/${group.id}/dashboard`);
+    }}><option value="">{language === 'ko' ? '전체 그룹 보기' : 'View all groups'}</option><optgroup label={language === 'ko' ? '개인 일정' : 'Personal schedule'}>{groups.filter((group) => group.type === 'PERSONAL').map((group) => <option value={group.id} key={group.id}>● {group.name}</option>)}</optgroup><optgroup label={language === 'ko' ? '팀 그룹' : 'Teams'}>{teamGroups.map((group) => <option value={group.id} key={group.id}>◆ {group.name}</option>)}</optgroup></select><small>{language === 'ko' ? '목록을 열어 다른 그룹으로 바로 이동하세요.' : 'Open the list to move directly to another group.'}</small></label>}
     <div className="app-navigation-items">{items.map((item, index) => {
       const active = item.to === '/app' ? pathname === '/app' : pathname.startsWith(item.to);
-      if (item.to === '/groups') return <div className={`navigation-groups ${active ? 'active' : ''} ${groupsOpen ? 'open' : ''}`} key={item.to}><button type="button" onClick={() => setGroupsOpen((value) => !value)} aria-expanded={groupsOpen}><span className="app-navigation-icon" aria-hidden="true">{item.icon}</span><span>{labels[index]}</span><span className="navigation-group-chevron">⌄</span></button>{groupsOpen && <div className="navigation-group-list">{teamGroups.map((group) => <Link className={selectedGroupId === String(group.id) ? 'active' : ''} to={`/groups/${group.id}/dashboard`} key={group.id}><span>{group.imageUrl ? <AuthenticatedImage src={group.imageUrl} alt="" /> : group.name.slice(0, 1)}</span><strong>{group.name}</strong></Link>)}{teamGroups.length === 0 && <small>{language === 'ko' ? '참여 중인 그룹 없음' : 'No groups yet'}</small>}<Link className="navigation-all-groups" to="/groups">＋ {language === 'ko' ? '전체 그룹' : 'All groups'}</Link></div>}</div>;
       return <Link className={active ? 'active' : ''} to={item.to} key={item.to} aria-current={active ? 'page' : undefined}>
         <span className="app-navigation-icon" aria-hidden="true">{item.icon}</span>
         <span>{labels[index]}</span>
