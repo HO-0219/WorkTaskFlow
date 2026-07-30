@@ -42,10 +42,6 @@ public class ReportScheduleService {
     @Transactional
     public ReportScheduleResponse update(Long userId, Long groupId, UpdateReportScheduleRequest request) {
         GroupMember leader = requireTeamLeader(userId, groupId);
-        if (!leader.getUser().getEmail().equalsIgnoreCase(request.recipientEmail().trim())) {
-            throw new ApplicationException("REPORT_RECIPIENT_INVALID", HttpStatus.BAD_REQUEST,
-                    "보안을 위해 현재 팀장 계정의 인증된 이메일만 수신 주소로 사용할 수 있습니다.");
-        }
         if ((request.weeklyEnabled() || request.monthlyEnabled())
                 && leader.getGroup().getMembershipPlan() != Group.MembershipPlan.PAID) {
             throw new ApplicationException("PAID_SUBSCRIPTION_REQUIRED", HttpStatus.PAYMENT_REQUIRED,

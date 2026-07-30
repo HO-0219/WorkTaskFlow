@@ -1,16 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { authApi } from '../api/authApi';
-import { accessToken, errorMessage, sessionMode } from '../api/client';
+import { Link } from 'react-router-dom';
 import { BrandMark } from './BrandMark';
 import { useLanguage } from './LanguageContext';
 import { isPwaInstallAvailable, isRunningStandalone, promptPwaInstall } from './pwa';
 
 export function LandingPage() {
   const { t, language, setLanguage } = useLanguage();
-  const navigate = useNavigate();
-  const [demoPending, setDemoPending] = useState(false);
-  const [demoError, setDemoError] = useState('');
   const [installOpen, setInstallOpen] = useState(false);
   const [installable, setInstallable] = useState(isPwaInstallAvailable());
   const installDialogRef = useRef<HTMLElement>(null);
@@ -56,21 +51,6 @@ export function LandingPage() {
     };
   }, [installOpen]);
 
-  async function startDemo() {
-    setDemoPending(true);
-    setDemoError('');
-    try {
-      const token = await authApi.demo();
-      accessToken.set(token.accessToken, token.expiresIn);
-      sessionMode.setDemo();
-      navigate('/app');
-    } catch (error) {
-      setDemoError(errorMessage(error));
-    } finally {
-      setDemoPending(false);
-    }
-  }
-
   async function install() {
     if (installable) {
       await promptPwaInstall();
@@ -100,11 +80,10 @@ export function LandingPage() {
       <p>{t('요청, 승인, 담당자 선택, 진행 상황과 캘린더까지. 팀이 지금 무엇을 해야 하는지 누구나 같은 화면에서 확인하세요.', 'Requests, approvals, ownership, progress, and calendar—give everyone one clear view of what comes next.')}</p>
       <div className="landing-hero-actions">
         <Link className="landing-primary" to="/login">{t('무료로 시작하기', 'Start for free')} <span>→</span></Link>
-        <button className="landing-demo" type="button" disabled={demoPending} onClick={startDemo}>{demoPending ? t('데모 준비 중...', 'Opening demo...') : t('김팀장의 데모 둘러보기', 'Explore the manager demo')} <span>↗</span></button>
+        <Link className="landing-demo" to="/demo">{t('김팀장의 데모 둘러보기', 'Explore the manager demo')} <span>↗</span></Link>
       </div>
       <button className="landing-pwa-hero" type="button" onClick={() => setInstallOpen(true)} disabled={installed}><span aria-hidden="true">↓</span>{installed ? t('ToTaskFlow 앱으로 실행 중', 'Running as the ToTaskFlow app') : t('앱스토어 없이, 이 기기에 ToTaskFlow 추가', 'Add ToTaskFlow to this device—no app store')}</button>
-      <small>{t('데모는 공용 읽기 전용 환경입니다. 실제 개인정보를 입력하지 마세요.', 'The demo is shared and read-only. Do not enter real personal information.')}</small>
-      {demoError && <p className="landing-error">{demoError}</p>}
+      <small>{t('데모는 실제 시스템과 분리된 읽기 전용 화면입니다.', 'The demo is a read-only experience isolated from the live system.')}</small>
     </section>
 
     <section className="landing-product" aria-label={t('제품 화면 미리보기', 'Product preview')}>
@@ -140,10 +119,10 @@ export function LandingPage() {
 
     <section className="landing-confidence">
       <div><span className="landing-section-label">{t('안심하고 시험하기', 'Try it with confidence')}</span><h2>{t('브라우저에서 시작하고, 팀에 맞으면 그대로 이어가세요.', 'Start in the browser and keep going when it fits your team.')}</h2></div>
-      <div className="landing-confidence-grid"><article><b>01</b><strong>{t('읽기 전용 데모', 'Read-only demo')}</strong><p>{t('김팀장과 팀원 더미 데이터로 실제 화면과 흐름을 먼저 확인합니다.', 'Explore real screens and flows with manager and teammate sample data.')}</p></article><article><b>02</b><strong>{t('설치 선택권', 'Optional installation')}</strong><p>{t('다운로드 없이 사용하고, 자주 쓰는 기기에만 PWA로 추가합니다.', 'Use it without a download, then add the PWA only on devices you choose.')}</p></article><article><b>03</b><strong>{t('데이터 분리 원칙', 'Data boundaries')}</strong><p>{t('그룹 권한, 읽기 전용 데모, 인증된 이미지 접근을 서버에서 구분합니다.', 'Server-side rules separate group access, read-only demo use, and protected images.')}</p></article></div>
+      <div className="landing-confidence-grid"><article><b>01</b><strong>{t('읽기 전용 데모', 'Read-only demo')}</strong><p>{t('김팀장과 팀원 더미 데이터로 실제 화면과 흐름을 먼저 확인합니다.', 'Explore real screens and flows with manager and teammate sample data.')}</p></article><article><b>02</b><strong>{t('설치 선택권', 'Optional installation')}</strong><p>{t('다운로드 없이 사용하고, 자주 쓰는 기기에만 PWA로 추가합니다.', 'Use it without a download, then add the PWA only on devices you choose.')}</p></article><article><b>03</b><strong>{t('데이터 분리 원칙', 'Data boundaries')}</strong><p>{t('데모 데이터는 브라우저 샘플로만 제공되어 실제 계정·업무·결제 데이터와 섞이지 않습니다.', 'Demo data stays in the browser sample and never mixes with real accounts, work, or payments.')}</p></article></div>
     </section>
 
-    <section className="landing-final-cta"><BrandMark /><h2>{t('오늘의 업무를 더 선명하게.', 'Make today’s work clearer.')}</h2><p>{t('팀의 다음 행동이 보이는 작업 공간을 지금 시작하세요.', 'Start a workspace where the next action is always visible.')}</p><div><Link to="/login">{t('무료로 시작하기', 'Start for free')} →</Link><button type="button" onClick={startDemo}>{t('데모 보기', 'View demo')}</button></div></section>
+    <section className="landing-final-cta"><BrandMark /><h2>{t('오늘의 업무를 더 선명하게.', 'Make today’s work clearer.')}</h2><p>{t('팀의 다음 행동이 보이는 작업 공간을 지금 시작하세요.', 'Start a workspace where the next action is always visible.')}</p><div><Link to="/login">{t('무료로 시작하기', 'Start for free')} →</Link><Link to="/demo">{t('데모 보기', 'View demo')}</Link></div></section>
     <footer><Link to="/" className="landing-brand"><BrandMark /><strong>ToTaskFlow</strong></Link><nav><Link to="/privacy">{t('개인정보 처리방침', 'Privacy')}</Link><Link to="/terms">{t('이용약관', 'Terms')}</Link><Link to="/paid-terms">{t('유료서비스 약관', 'Paid terms')}</Link><Link to="/refund-policy">{t('환불 정책', 'Refunds')}</Link><Link to="/site-map">{t('사이트맵', 'Site map')}</Link></nav><small>© 2026 ToTaskFlow</small></footer>
 
     {installOpen && <div className="landing-install-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setInstallOpen(false)}><section ref={installDialogRef} role="dialog" aria-modal="true" aria-labelledby={installTitleId} tabIndex={-1}><button className="landing-install-close" type="button" onClick={() => setInstallOpen(false)} aria-label={t('닫기', 'Close')}>×</button><span className="landing-install-icon"><BrandMark /></span><h2 id={installTitleId}>{t('ToTaskFlow를 앱으로 만들까요?', 'Make ToTaskFlow an app?')}</h2><p>{t('앱스토어 다운로드 없이 홈 화면과 앱 목록에 아이콘을 추가합니다.', 'Add an icon to your home screen and app list without an app store download.')}</p><ul><li>{t('독립된 앱 화면으로 빠르게 실행됩니다.', 'Opens quickly in its own app window.')}</li><li>{t('기본 화면 일부를 저장하지만, 최신 조회와 변경에는 인터넷이 필요합니다.', 'Keeps part of the shell offline; current data and changes still need internet.')}</li><li>{t('알림·카메라 같은 권한은 자동으로 허용되지 않습니다.', 'Notification and camera permissions are not granted automatically.')}</li><li>{t('기기 설정에서 언제든 제거할 수 있습니다.', 'You can remove it anytime in device settings.')}</li></ul>{installable ? <div className="landing-install-actions"><button type="button" onClick={() => setInstallOpen(false)}>{t('나중에', 'Not now')}</button><button className="confirm" type="button" onClick={install}>{t('APP 만들기', 'Install app')}</button></div> : <div className="landing-install-manual"><strong>{t('브라우저 메뉴에서 직접 추가해 주세요.', 'Add it from your browser menu.')}</strong><p>{t('iPhone/iPad: Safari 공유 버튼 → 홈 화면에 추가\nAndroid/PC: 브라우저 메뉴 → 앱 설치 또는 홈 화면에 추가', 'iPhone/iPad: Safari Share → Add to Home Screen\nAndroid/Desktop: Browser menu → Install app or Add to Home Screen')}</p></div>}</section></div>}

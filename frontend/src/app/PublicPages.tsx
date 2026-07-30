@@ -90,7 +90,7 @@ export function TermsPage() {
     <PolicySection title={t('1. 서비스의 목적', '1. Purpose')}><p>{t('ToTaskFlow는 그룹 업무, 일정, 알림과 협업 기록을 관리하는 서비스를 제공합니다.', 'ToTaskFlow provides group task, schedule, notification, and collaboration-record features.')}</p></PolicySection>
     <PolicySection title={t('2. 계정 관리', '2. Accounts')}><p>{t('사용자는 정확한 정보를 제공하고 인증정보를 안전하게 관리해야 합니다. 계정 공유, 타인 사칭, 무단 접근 시도는 허용되지 않습니다.', 'Users must provide accurate information and protect account credentials. Account sharing, impersonation, and unauthorized access attempts are prohibited.')}</p></PolicySection>
     <PolicySection title={t('3. 협업 데이터', '3. Workspace data')}><p>{t('그룹에 등록한 업무와 댓글은 다른 그룹 멤버에게 공개됩니다. 사용자는 필요한 권한이 있는 정보만 등록해야 하며 불법·침해 콘텐츠를 게시해서는 안 됩니다.', 'Tasks and comments are visible to relevant group members. Users must only upload authorized information and may not post unlawful or infringing content.')}</p></PolicySection>
-    <PolicySection title={t('4. 데모와 시험 기능', '4. Demo and preview features')}><p>{t('공용 데모는 읽기 전용이며 실제 개인정보나 비밀정보를 입력해서는 안 됩니다. 시험 기능은 예고 없이 변경될 수 있습니다.', 'The shared demo is read-only and must not receive real personal or confidential information. Preview features may change without notice.')}</p></PolicySection>
+    <PolicySection title={t('4. 데모와 시험 기능', '4. Demo and preview features')}><p>{t('제품 데모는 실제 API와 데이터베이스에서 분리된 읽기 전용 샘플 화면입니다. 시험 기능은 예고 없이 변경될 수 있습니다.', 'The product demo is a read-only sample isolated from live APIs and databases. Preview features may change without notice.')}</p></PolicySection>
     <PolicySection title={t('5. 변경과 중단', '5. Changes and availability')}><p>{t('보안, 유지보수 또는 불가피한 사유로 서비스 일부가 변경·중단될 수 있습니다. 중요한 변경은 합리적인 방법으로 사전에 안내합니다.', 'Features may change or become unavailable for security, maintenance, or unavoidable reasons. Material changes will be announced through reasonable channels.')}</p></PolicySection>
     <aside className="policy-notice">{t('유료 서비스, 환불, 준거법과 사업자 정보는 실제 판매 시작 전에 별도 약관과 법률 검토를 통해 보완해야 합니다.', 'Paid plans, refunds, governing law, and legal entity information must be finalized before commercial launch.')}</aside>
   </PublicLayout>;
@@ -123,7 +123,7 @@ export function RefundPolicyPage() {
 export function SiteMapPage() {
   const { t } = useLanguage();
   const sections = [
-    { title: t('서비스 알아보기', 'Explore'), links: [['/', t('서비스 소개', 'Overview')], ['/product', t('제품', 'Product')], ['/b2b', t('B2B 솔루션', 'B2B solutions')], ['/pricing', t('가격', 'Pricing')], ['/contact', t('문의', 'Contact')]] },
+    { title: t('서비스 알아보기', 'Explore'), links: [['/', t('서비스 소개', 'Overview')], ['/demo', t('읽기 전용 데모', 'Read-only demo')], ['/product', t('제품', 'Product')], ['/b2b', t('B2B 솔루션', 'B2B solutions')], ['/pricing', t('가격', 'Pricing')], ['/contact', t('문의', 'Contact')]] },
     { title: t('시작', 'Start'), links: [['/login', t('로그인·무료 시작', 'Log in · get started')], ['/signup', t('회원가입', 'Sign up')]] },
     { title: t('내 작업 공간', 'My workspace'), links: [['/app', t('내 대시보드', 'Dashboard')], ['/groups', t('그룹', 'Groups')], ['/calendar', t('캘린더', 'Calendar')], ['/notifications', t('알림', 'Alerts')]] },
     { title: t('계정', 'Account'), links: [['/profile', t('프로필', 'Profile')], ['/account', t('계정 및 보안', 'Account & security')], ['/payments', t('결제수단 및 테스트', 'Payments & tests')]] },

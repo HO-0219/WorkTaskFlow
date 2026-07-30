@@ -26,6 +26,7 @@ import { PageMeta } from './PageMeta';
 import { isRunningStandalone } from './pwa';
 import { SessionKeepAlive } from './SessionKeepAlive';
 import { AdminPage } from '../features/admin/AdminPage';
+import { DemoPage } from './DemoPage';
 
 export default function App() {
   return <LanguageProvider><BrowserRouter>
@@ -36,6 +37,7 @@ export default function App() {
     <SessionKeepAlive />
     <div id="main-content" tabIndex={-1}><Routes>
     <Route path="/" element={<LandingPage />} />
+    <Route path="/demo" element={<DemoPage />} />
     <Route path="/app" element={<HomePage />} />
     <Route path="/privacy" element={<PrivacyPage />} />
     <Route path="/terms" element={<TermsPage />} />
@@ -102,6 +104,7 @@ function RouteAnnouncer() {
 function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (language === 'en') {
     if (pathname === '/') return 'ToTaskFlow'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts';
+    if (pathname === '/demo') return 'Product demo';
     if (pathname === '/groups') return 'Groups'; if (pathname === '/profile') return 'Profile'; if (pathname === '/account') return 'Account settings';
     if (pathname === '/payments') return 'Payments'; if (pathname === '/admin') return 'Admin';
     if (pathname === '/product') return 'Product'; if (pathname === '/b2b') return 'B2B solutions'; if (pathname === '/pricing') return 'Pricing'; if (pathname === '/contact') return 'Contact';
@@ -112,6 +115,7 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
     if (pathname === '/oauth/consent') return 'Google sign-up consent';
   }
   if (pathname === '/') return 'ToTaskFlow';
+  if (pathname === '/demo') return '제품 데모';
   if (pathname === '/app') return '내 대시보드';
   if (pathname === '/calendar') return '캘린더';
   if (pathname === '/notifications') return '알림';
