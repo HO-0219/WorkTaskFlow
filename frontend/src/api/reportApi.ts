@@ -15,7 +15,7 @@ export const reportApi = {
   }, true),
   download: async (groupId: number, from: string, to: string, language: 'KO' | 'EN') => {
     const result = await requestBlob(`/groups/${groupId}/reports/download?from=${from}&to=${to}&language=${language}`,
-      `totaskflow-report-${language.toLowerCase()}.html`);
+      `toesa-report-${language.toLowerCase()}.html`);
     saveBlob(result.blob, result.filename);
   },
 };

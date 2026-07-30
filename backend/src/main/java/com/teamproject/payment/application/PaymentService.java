@@ -124,7 +124,7 @@ public class PaymentService {
         PaymentAttempt attempt = attempts.save(new PaymentAttempt(user, method,
                 PaymentAttempt.OperationType.SUBSCRIPTION_CHARGE, UUID.randomUUID().toString(), orderId, amount));
         TossPaymentsClient.ApiResult result = toss.charge(cipher.decrypt(method.getEncryptedBillingKey()),
-                user.getPaymentCustomerKey(), amount, orderId, "ToTaskFlow 팀 구독", attempt.getIdempotencyKey());
+                user.getPaymentCustomerKey(), amount, orderId, "퇴사 팀 구독", attempt.getIdempotencyKey());
         if (!result.successful()) {
             fail(attempt, result);
             throw providerFailure(result);

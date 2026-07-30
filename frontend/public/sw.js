@@ -1,4 +1,4 @@
-const CACHE_NAME = 'totaskflow-shell-v6';
+const CACHE_NAME = 'toesa-shell-v7';
 const APP_SHELL = ['/app', '/manifest.webmanifest', '/icons/app-icon.svg', '/icons/app-icon-192.png', '/icons/app-icon-512.png', '/icons/app-icon-maskable-512.png'];
 
 self.addEventListener('install', (event) => {

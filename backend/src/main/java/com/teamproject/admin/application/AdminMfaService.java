@@ -44,7 +44,7 @@ public class AdminMfaService {
         }
         if (value == null) credentials.save(new AdminMfaCredential(user, cipher.encrypt(secret)));
         else value.replacePendingSecret(cipher.encrypt(secret));
-        String issuer = "ToTaskFlow";
+        String issuer = "toesa";
         String label = issuer + ":" + user.getUsername();
         String uri = "otpauth://totp/" + url(label) + "?secret=" + secret + "&issuer=" + url(issuer)
                 + "&algorithm=SHA1&digits=6&period=30";

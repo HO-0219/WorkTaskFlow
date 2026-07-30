@@ -50,9 +50,9 @@ export function DemoPage() {
 
   return <div className="demo-page">
     <aside className="demo-nav">
-      <Link className="demo-brand" to="/"><span><BrandMark /></span><strong>ToTaskFlow</strong></Link>
+      <Link className="demo-brand" to="/"><span><BrandMark /></span><strong>{t('퇴사', 'toesa')}</strong></Link>
       <div className="demo-readonly"><b>● {t('읽기 전용 데모', 'Read-only demo')}</b><small>{t('API와 데이터베이스에 연결되지 않습니다.', 'No API or database connection.')}</small></div>
-      <label className="demo-team-switcher"><span>{t('현재 그룹', 'Current team')}</span><strong>🚀 {t('ToTaskFlow 런칭 준비팀', 'ToTaskFlow Launch Team')}</strong><small>{t('멤버 6명 · 팀장 김서준', '6 members · Lead Seo-jun Kim')}</small></label>
+      <label className="demo-team-switcher"><span>{t('현재 그룹', 'Current team')}</span><strong>🚀 {t('퇴사 런칭 준비팀', 'toesa Launch Team')}</strong><small>{t('멤버 6명 · 팀장 김서준', '6 members · Lead Seo-jun Kim')}</small></label>
       <nav aria-label={t('데모 메뉴', 'Demo navigation')}>
         <DemoNavButton active={view === 'dashboard'} icon="⌂" onClick={() => setView('dashboard')}>{t('대시보드', 'Dashboard')}</DemoNavButton>
         <DemoNavButton active={view === 'tasks'} icon="✓" onClick={() => setView('tasks')}>{t('업무', 'Tasks')}<i>12</i></DemoNavButton>

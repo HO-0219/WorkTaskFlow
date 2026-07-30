@@ -17,7 +17,7 @@ public class ReportDocumentService {
         String html = render(report, language);
         String suffix = language == Language.KO ? "ko" : "en";
         return new ReportDocument(html.getBytes(StandardCharsets.UTF_8),
-                "totaskflow-" + groupId + "-" + from + "-" + to.minusDays(1) + "-" + suffix + ".html",
+                "toesa-" + groupId + "-" + from + "-" + to.minusDays(1) + "-" + suffix + ".html",
                 subject(report.groupName(), from, to, language), html);
     }
     private String render(GroupDashboardResponse value, Language language) {
@@ -62,8 +62,8 @@ public class ReportDocumentService {
                 ko ? "규칙 기반 요약" : "Rule-based summary", insightHtml,
                 ko ? "업무 상세" : "Task details", ko ? "업무" : "Task", ko ? "상태" : "Status",
                 ko ? "담당자" : "Assignee", ko ? "마감" : "Due", rows,
-                ko ? "이 문서는 ToTaskFlow의 확정 데이터로 생성됐으며 AI 추론을 사용하지 않았습니다."
-                        : "Generated from confirmed ToTaskFlow data without AI inference.");
+                ko ? "이 문서는 퇴사의 확정 데이터로 생성됐으며 AI 추론을 사용하지 않았습니다."
+                        : "Generated from confirmed toesa data without AI inference.");
     }
     private List<String> insights(GroupDashboardResponse value, boolean ko) {
         java.util.ArrayList<String> result = new java.util.ArrayList<>();
@@ -81,8 +81,8 @@ public class ReportDocumentService {
     }
     private String subject(String groupName, LocalDate from, LocalDate to, Language language) {
         return language == Language.KO
-                ? "[ToTaskFlow] " + groupName + " 업무 리포트 (" + from + " ~ " + to.minusDays(1) + ")"
-                : "[ToTaskFlow] " + groupName + " Work Report (" + from + " – " + to.minusDays(1) + ")";
+                ? "[퇴사] " + groupName + " 업무 리포트 (" + from + " ~ " + to.minusDays(1) + ")"
+                : "[toesa] " + groupName + " Work Report (" + from + " – " + to.minusDays(1) + ")";
     }
     private String label(String status, boolean ko) {
         if (!ko) return status.replace('_', ' ');
