@@ -5,11 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teamproject.notification.domain.PushSubscription;
 import com.teamproject.notification.domain.PushSubscriptionRepository;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Security;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
@@ -28,6 +37,7 @@ public class WebPushDeliveryService {
     private final String publicKey;
     private final String privateKey;
     private final String subject;
+    private final CloseableHttpClient httpClient;
     private PushService pushService;
 
     public WebPushDeliveryService(PushSubscriptionRepository subscriptions, ObjectMapper objectMapper,
@@ -39,6 +49,7 @@ public class WebPushDeliveryService {
         this.publicKey = publicKey.trim();
         this.privateKey = privateKey.trim();
         this.subject = subject.trim();
+        this.httpClient = HttpClients.createSystem();
     }
 
     @PostConstruct
@@ -52,6 +63,11 @@ public class WebPushDeliveryService {
         } catch (Exception exception) {
             throw new IllegalStateException("Invalid VAPID Web Push configuration", exception);
         }
+    }
+
+    @PreDestroy
+    void closeHttpClient() throws IOException {
+        httpClient.close();
     }
 
     @Async
@@ -81,11 +97,9 @@ public class WebPushDeliveryService {
     }
 
     private void send(PushSubscription subscription, byte[] payload) {
-        try {
-            var response = pushService.send(new Notification(subscription.getEndpoint(),
-                    subscription.getP256dhKey(), subscription.getAuthSecret(), payload));
+        try (CloseableHttpResponse response = httpClient.execute(request(subscription, payload))) {
             int status = response.getStatusLine().getStatusCode();
-            // 403은 구독이 만들어질 때 쓰인 VAPID 키와 서명 키가 달라진 경우다. 남겨 두면 계속 실패하므로 함께 정리한다.
+            // 거절되었거나 만료된 구독은 남겨 두면 계속 실패하므로 함께 정리한다.
             if (status == 403 || status == 404 || status == 410) {
                 log.warn("Dropping push subscription {} after provider status {}: {}",
                         subscription.getId(), status, reason(response));
@@ -96,8 +110,6 @@ public class WebPushDeliveryService {
             } else {
                 log.debug("Web Push delivered to subscription {}", subscription.getId());
             }
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
         } catch (Exception exception) {
             log.warn("Web Push delivery failed for subscription {}", subscription.getId(), exception);
         } catch (LinkageError error) {
@@ -105,6 +117,21 @@ public class WebPushDeliveryService {
             log.error("Web Push delivery aborted for subscription {} by a dependency mismatch",
                     subscription.getId(), error);
         }
+    }
+
+    private HttpPost request(PushSubscription subscription, byte[] payload) throws Exception {
+        HttpPost request = pushService.preparePost(new Notification(subscription.getEndpoint(),
+                subscription.getP256dhKey(), subscription.getAuthSecret(), payload), Encoding.AES128GCM);
+        // web-push 5.1.2는 이 헤더의 Base64URL 값에 패딩을 붙이지만 FCM은 패딩 없는 형식만 허용한다.
+        var cryptoKey = request.getFirstHeader("Crypto-Key");
+        if (cryptoKey != null) request.setHeader("Crypto-Key", normalizeCryptoKey(cryptoKey.getValue()));
+        return request;
+    }
+
+    static String normalizeCryptoKey(String value) {
+        return Arrays.stream(value.split(";", -1))
+                .map(part -> part.replaceFirst("=+$", ""))
+                .collect(Collectors.joining(";"));
     }
 
     // 푸시 제공자는 거절 사유를 본문에 담아 보낸다. 이게 없으면 상태 코드만으로 원인을 좁힐 수 없다.
