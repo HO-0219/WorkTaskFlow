@@ -97,6 +97,37 @@ class TaskChecklistApiTest {
     }
 
     @Test
+    void taskCreationStoresChecklistItemsForTheRequester() throws Exception {
+        String ownerToken = signupAndLogin("check_creator", "check-creator@example.com");
+        long groupId = createTeam(ownerToken, "체크리스트 등록");
+        String requesterUsername = "check_requester";
+        String requesterToken = signupAndLogin(requesterUsername, requesterUsername + "@example.com");
+        addMember(groupId, requesterUsername);
+
+        // 승인 전이고 담당자도 없는 요청자가 등록 화면에서 체크리스트까지 만든다.
+        var result = mvc.perform(post("/api/v1/groups/{groupId}/tasks", groupId)
+                        .header("Authorization", bearer(requesterToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"등록 시 체크리스트\",\"checklistItems\""
+                                + ":[\"자료 조사\",\"   \",\" 초안 작성 \"]}"))
+                .andExpect(status().isCreated()).andReturn();
+        long taskId = ((Number) JsonPath.read(result.getResponse().getContentAsString(), "$.id")).longValue();
+
+        mvc.perform(get("/api/v1/tasks/{taskId}/checklist-items", taskId)
+                        .header("Authorization", bearer(requesterToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(2))
+                .andExpect(jsonPath("$.progressPercent").value(0))
+                .andExpect(jsonPath("$.items[0].content").value("자료 조사"))
+                .andExpect(jsonPath("$.items[0].sortOrder").value(0))
+                .andExpect(jsonPath("$.items[1].content").value("초안 작성"))
+                .andExpect(jsonPath("$.items[1].sortOrder").value(1));
+        var events = activityEvents.findAllByTaskIdOrderByOccurredAtAscIdAsc(taskId);
+        org.assertj.core.api.Assertions.assertThat(events).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(events.get(0).getChecklistTotal()).isEqualTo(2);
+    }
+
+    @Test
     void activeMemberReadsButCannotWriteAndOutsiderCannotRead() throws Exception {
         Fixture fixture = fixture("access");
         long itemId = createItem(fixture.ownerToken(), fixture.taskId(), "읽기 전용", null);

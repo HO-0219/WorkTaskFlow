@@ -13,6 +13,8 @@ import com.teamproject.task.application.dto.TaskDtos.UpdateTaskRequest;
 import com.teamproject.group.domain.Group;
 import com.teamproject.notification.application.NotificationService;
 import com.teamproject.task.domain.Task;
+import com.teamproject.task.domain.TaskChecklistItem;
+import com.teamproject.task.domain.TaskChecklistItemRepository;
 import com.teamproject.task.domain.TaskRepository;
 import com.teamproject.task.domain.TaskStatusHistory;
 import com.teamproject.task.domain.TaskStatusHistoryRepository;
@@ -31,16 +33,18 @@ public class TaskService {
     private final GroupAuthorization authorization;
     private final TaskRepository tasks;
     private final TaskStatusHistoryRepository histories;
+    private final TaskChecklistItemRepository checklistItems;
     private final NotificationService notifications;
     private final TaskActivityRecorder activity;
     private final Clock clock;
 
     public TaskService(GroupAuthorization authorization, TaskRepository tasks,
-            TaskStatusHistoryRepository histories, NotificationService notifications,
-            TaskActivityRecorder activity, Clock clock) {
+            TaskStatusHistoryRepository histories, TaskChecklistItemRepository checklistItems,
+            NotificationService notifications, TaskActivityRecorder activity, Clock clock) {
         this.authorization = authorization;
         this.tasks = tasks;
         this.histories = histories;
+        this.checklistItems = checklistItems;
         this.notifications = notifications;
         this.activity = activity;
         this.clock = clock;
@@ -52,6 +56,8 @@ public class TaskService {
         Task task = tasks.save(new Task(requester.getGroup(), requester, request.title().trim(),
                 blankToNull(request.description()), priority(request.priority()), request.dueAt()));
         histories.save(new TaskStatusHistory(task, null, task.getStatus(), requester, null));
+        // 등록 시점의 체크리스트까지 저장한 뒤에 기록해야 활동 이벤트의 항목 수가 맞는다.
+        createChecklist(task, request.checklistItems());
         activity.record(task, requester, TaskActivityEvent.Type.TASK_CREATED);
         notifications.taskRequested(task, requester);
         return response(task);
@@ -196,6 +202,17 @@ public class TaskService {
                         history.getFromStatus() == null ? null : history.getFromStatus().name(),
                         history.getToStatus().name(), history.getChangedBy().getId(),
                         history.getReason(), history.getCreatedAt())).toList();
+    }
+
+    private void createChecklist(Task task, List<String> contents) {
+        if (contents == null || contents.isEmpty()) return;
+        int sortOrder = 0;
+        for (String content : contents) {
+            // 화면에서 비워 둔 줄은 항목으로 치지 않는다.
+            if (content == null || content.isBlank()) continue;
+            checklistItems.save(new TaskChecklistItem(task, content.trim(), sortOrder++));
+        }
+        checklistItems.flush();
     }
 
     private Task.Priority priority(String value) {

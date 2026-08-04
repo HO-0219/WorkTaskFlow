@@ -65,6 +65,7 @@ export type CreateTaskRequest = {
   description?: string;
   priority: TaskPriority;
   dueAt?: string;
+  checklistItems?: string[];
 };
 
 export type UpdateTaskRequest = {

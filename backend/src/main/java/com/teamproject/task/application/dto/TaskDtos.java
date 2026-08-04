@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public final class TaskDtos {
     private TaskDtos() {}
@@ -15,7 +16,12 @@ public final class TaskDtos {
             @NotBlank @Size(max = 120) String title,
             @Size(max = 5000) String description,
             String priority,
-            LocalDateTime dueAt) {}
+            LocalDateTime dueAt,
+            @Size(max = 30) List<@Size(max = 300) String> checklistItems) {
+        public CreateTaskRequest(String title, String description, String priority, LocalDateTime dueAt) {
+            this(title, description, priority, dueAt, null);
+        }
+    }
 
     public record TaskResponse(
             Long id, Long groupId, Long requesterMemberId, Long approverMemberId, Long assigneeMemberId,

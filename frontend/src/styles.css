@@ -201,6 +201,13 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .task-checklist-form { display: flex; gap: 8px; margin-top: 12px; }
 .task-checklist-form input { min-width: 0; flex: 1; padding: 11px 13px; border: 1px solid #dce0ea; border-radius: 10px; }
 .task-checklist-readonly { display: block; margin-top: 12px; color: #858c9c; }
+.checklist-draft { display: grid; gap: 8px; }
+.checklist-draft-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.checklist-draft-list li { display: flex; align-items: center; gap: 8px; }
+.checklist-draft-list input { min-width: 0; flex: 1; }
+.checklist-draft-remove { flex: 0 0 auto; width: 50px; height: 50px; border: 1px solid #e3e6ef; border-radius: 10px; color: #737b8c; font-size: 18px; line-height: 1; background: #fff; cursor: pointer; }
+.checklist-draft-remove:hover:not(:disabled) { border-color: #e0b6c0; color: #b3263e; }
+.checklist-draft-add { justify-self: start; padding: 9px 14px; }
 .task-comment-list { display: grid; gap: 10px; margin-top: 14px; }
 .task-comment { padding: 14px; border: 1px solid #e3e6ef; border-radius: 12px; background: #fff; }
 .task-comment header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
