@@ -40,6 +40,27 @@ class NotificationApiTest {
     @Autowired TaskReminderScheduler reminders;
 
     @Test
+    void pushConfigurationIsAuthenticatedAndDisabledWithoutVapidKeys() throws Exception {
+        Fixture fixture = fixture("push_config");
+
+        mvc.perform(get("/api/v1/notifications/push-config"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/notifications/push-config")
+                        .header("Authorization", bearer(fixture.ownerToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.publicKey").value(""))
+                .andExpect(jsonPath("$.consentAgreed").value(false));
+        mvc.perform(post("/api/v1/notifications/push-subscriptions")
+                        .header("Authorization", bearer(fixture.ownerToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"endpoint\":\"https://fcm.googleapis.com/push/test\","
+                                + "\"p256dh\":\"test-key\",\"auth\":\"test-auth\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("PUSH_NOT_CONFIGURED"));
+    }
+
+    @Test
     void soleLeaderReceivesOwnApprovalAndSelfAssignmentNotifications() throws Exception {
         Fixture fixture = fixture("self_flow");
         long taskId = createTask(fixture.ownerToken(), fixture.groupId(), "혼자 관리하는 업무");

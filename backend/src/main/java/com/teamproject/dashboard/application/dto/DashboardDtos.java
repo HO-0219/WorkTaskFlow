@@ -37,7 +37,7 @@ public final class DashboardDtos {
             long completedWithDueDateCount, long onTimeCompletedCount, Integer onTimeRatePercent,
             Long averageCompletionHours, List<MemberMetrics> members,
             List<DashboardTaskResponse> riskTasks, List<DashboardTaskResponse> periodTasks,
-            List<CalendarItemResponse> calendarItems) {}
+            List<DashboardTaskResponse> statusTasks, List<CalendarItemResponse> calendarItems) {}
 
     public record MemberReportResponse(Long groupId, String groupName, Long memberId,
             LocalDate periodFrom, LocalDate periodTo, List<DashboardTaskResponse> tasks) {}

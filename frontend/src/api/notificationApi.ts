@@ -27,6 +27,9 @@ export type NotificationPageResponse = {
   unreadCount: number;
 };
 
+export type PushConfigResponse = { enabled: boolean; publicKey: string; consentAgreed: boolean };
+export type PushSubscriptionRequest = { endpoint: string; p256dh: string; auth: string };
+
 export const notificationApi = {
   list: (size = 20, cursor?: number) => request<NotificationPageResponse>(
     `/notifications?size=${size}${cursor ? `&cursor=${cursor}` : ''}`, {}, true,
@@ -39,5 +42,12 @@ export const notificationApi = {
   }, true),
   delete: (notificationId: number) => request<void>(`/notifications/${notificationId}`, {
     method: 'DELETE',
+  }, true),
+  pushConfig: () => request<PushConfigResponse>('/notifications/push-config', {}, true),
+  subscribePush: (body: PushSubscriptionRequest) => request<void>('/notifications/push-subscriptions', {
+    method: 'POST', body: JSON.stringify(body),
+  }, true),
+  unsubscribePush: (endpoint: string) => request<void>('/notifications/push-subscriptions', {
+    method: 'DELETE', body: JSON.stringify({ endpoint }),
   }, true),
 };

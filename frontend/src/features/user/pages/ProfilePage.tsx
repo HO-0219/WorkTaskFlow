@@ -6,6 +6,7 @@ import { AppNavigation } from '../../../app/AppNavigation';
 import { authApi } from '../../../api/authApi';
 import { useLanguage } from '../../../app/LanguageContext';
 import { AuthenticatedImage } from '../../../app/AuthenticatedImage';
+import { disablePushForCurrentDevice } from '../../../app/pushNotifications';
 
 export function ProfilePage() {
   const { t } = useLanguage();
@@ -39,6 +40,7 @@ export function ProfilePage() {
   }
 
   async function logout() {
+    await disablePushForCurrentDevice().catch(() => undefined);
     await authApi.logout().catch(() => undefined);
     accessToken.clear();
     sessionMode.clear();

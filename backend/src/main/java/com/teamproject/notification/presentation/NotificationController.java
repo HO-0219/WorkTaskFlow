@@ -1,9 +1,14 @@
 package com.teamproject.notification.presentation;
 
 import com.teamproject.notification.application.NotificationService;
+import com.teamproject.notification.application.PushSubscriptionService;
 import com.teamproject.notification.application.dto.NotificationDtos.NotificationPageResponse;
 import com.teamproject.notification.application.dto.NotificationDtos.NotificationResponse;
 import com.teamproject.notification.application.dto.NotificationDtos.ReadAllResponse;
+import com.teamproject.notification.application.dto.PushDtos.PushConfigResponse;
+import com.teamproject.notification.application.dto.PushDtos.PushSubscriptionRequest;
+import com.teamproject.notification.application.dto.PushDtos.PushUnsubscribeRequest;
+import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +17,28 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
     private final NotificationService notifications;
-    public NotificationController(NotificationService notifications) { this.notifications = notifications; }
+    private final PushSubscriptionService pushSubscriptions;
+    public NotificationController(NotificationService notifications, PushSubscriptionService pushSubscriptions) {
+        this.notifications = notifications;
+        this.pushSubscriptions = pushSubscriptions;
+    }
+
+    @GetMapping("/push-config")
+    PushConfigResponse pushConfig(Authentication authentication) {
+        return pushSubscriptions.config((Long) authentication.getPrincipal());
+    }
+
+    @PostMapping("/push-subscriptions")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void subscribe(Authentication authentication, @Valid @RequestBody PushSubscriptionRequest request) {
+        pushSubscriptions.subscribe((Long) authentication.getPrincipal(), request);
+    }
+
+    @DeleteMapping("/push-subscriptions")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void unsubscribe(Authentication authentication, @Valid @RequestBody PushUnsubscribeRequest request) {
+        pushSubscriptions.unsubscribe((Long) authentication.getPrincipal(), request.endpoint());
+    }
 
     @GetMapping
     NotificationPageResponse list(Authentication authentication,

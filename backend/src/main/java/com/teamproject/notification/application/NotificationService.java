@@ -12,6 +12,7 @@ import com.teamproject.notification.domain.NotificationRepository;
 import com.teamproject.task.domain.Task;
 import com.teamproject.user.domain.User;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +25,13 @@ import java.util.List;
 public class NotificationService {
     private final NotificationRepository notifications;
     private final GroupMemberRepository members;
+    private final ApplicationEventPublisher events;
 
-    public NotificationService(NotificationRepository notifications, GroupMemberRepository members) {
+    public NotificationService(NotificationRepository notifications, GroupMemberRepository members,
+            ApplicationEventPublisher events) {
         this.notifications = notifications;
         this.members = members;
+        this.events = events;
     }
 
     @Transactional
@@ -126,10 +130,10 @@ public class NotificationService {
     public void subscriptionRollout(User user, com.teamproject.group.domain.Group group,
             String eventKey, LocalDateTime deadline) {
         if (notifications.existsByRecipientIdAndEventKey(user.getId(), eventKey)) return;
-        notifications.save(new Notification(user, null, group, null, null,
+        publish(notifications.save(new Notification(user, null, group, null, null,
                 Notification.Type.SUBSCRIPTION_ROLLOUT_NOTICE, eventKey,
                 "유료 구독 전환 사전 안내",
-                deadline.toLocalDate() + "까지 무료 유지 또는 유료 구독 전환 여부를 선택해 주세요."));
+                deadline.toLocalDate() + "까지 무료 유지 또는 유료 구독 전환 여부를 선택해 주세요.")));
     }
 
     @Transactional(readOnly = true)
@@ -189,14 +193,26 @@ public class NotificationService {
                 .filter(recipient -> !notifications.existsByRecipientIdAndEventKey(recipient.getId(), eventKey))
                 .map(recipient -> new Notification(
                         recipient, actor, task.getGroup(), task, comment, type, eventKey, title, message))
-                .toList());
+                .toList()).forEach(this::publish);
     }
 
     private void createSecurity(User recipient, Notification.Type type, String eventKey,
             String title, String message) {
         if (!notifications.existsByRecipientIdAndEventKey(recipient.getId(), eventKey)) {
-            notifications.save(Notification.security(recipient, type, eventKey, title, message));
+            publish(notifications.save(Notification.security(recipient, type, eventKey, title, message)));
         }
+    }
+
+    private void publish(Notification notification) {
+        String targetUrl = notification.getTask() != null ? "/tasks/" + notification.getTask().getId()
+                : notification.getType() == Notification.Type.SECURITY_NEW_DEVICE
+                        || notification.getType() == Notification.Type.SECURITY_SESSION_REUSED ? "/account"
+                : notification.getType() == Notification.Type.SUBSCRIPTION_ROLLOUT_NOTICE
+                        && notification.getGroup() != null ? "/groups/" + notification.getGroup().getId()
+                : "/notifications";
+        events.publishEvent(new PushNotificationEvent(notification.getRecipient().getId(),
+                notification.getTitle(), notification.getMessage(), targetUrl,
+                "notification-" + notification.getId()));
     }
 
     private NotificationResponse response(Notification value) {

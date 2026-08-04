@@ -67,3 +67,8 @@ export function activatePwaUpdate() {
   updateRequested = true;
   registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
 }
+
+export async function pwaRegistration() {
+  if (!('serviceWorker' in navigator)) return undefined;
+  return registration ?? navigator.serviceWorker.ready;
+}

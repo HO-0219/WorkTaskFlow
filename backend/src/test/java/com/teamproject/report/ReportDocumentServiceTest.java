@@ -31,7 +31,7 @@ class ReportDocumentServiceTest {
                 Instant.parse("2026-07-30T00:00:00Z"), 7L, "퇴사 팀", "Asia/Seoul", "MEMBERS",
                 from, to, 4, new StatusCounts(0, 1, 2, 0, 1, 0, 0, 0), 50,
                 4, 1, 25, 1, 1, 100, 12L,
-                List.of(), List.of(), List.of(task), List.of());
+                List.of(), List.of(), List.of(task), List.of(task), List.of());
         when(dashboards.group(11L, 7L, from, to)).thenReturn(dashboard);
 
         var document = new ReportDocumentService(dashboards).generate(11L, 7L, from, to, Language.KO);

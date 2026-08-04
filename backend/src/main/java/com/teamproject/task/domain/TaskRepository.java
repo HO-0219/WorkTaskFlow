@@ -10,6 +10,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findAllByGroupIdOrderByCreatedAtDesc(Long groupId);
     List<Task> findAllByGroupIdAndDueAtGreaterThanEqualAndDueAtLessThanOrderByDueAtAscIdAsc(
             Long groupId, LocalDateTime from, LocalDateTime to);
+    @Query("select t from Task t where t.group.id = :groupId and t.dueAt is not null "
+            + "and t.dueAt >= :from and t.createdAt < :to order by t.dueAt, t.id")
+    List<Task> findAllTimelineTasks(Long groupId, LocalDateTime from, LocalDateTime to);
     List<Task> findAllByAssigneeUserIdAndAssigneeStatus(Long userId,
             com.teamproject.group.domain.GroupMember.Status status);
     @Query("select t from Task t where t.dueAt is not null and t.status in :statuses")

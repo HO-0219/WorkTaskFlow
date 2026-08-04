@@ -68,7 +68,8 @@ class DashboardApiTest {
                 .andExpect(jsonPath("$.members[1].completedCount").value(1))
                 .andExpect(jsonPath("$.members[1].onTimeRatePercent").value(100))
                 .andExpect(jsonPath("$.riskTasks[0].id").value(delayed))
-                .andExpect(jsonPath("$.riskTasks[0].delayed").value(true));
+                .andExpect(jsonPath("$.riskTasks[0].delayed").value(true))
+                .andExpect(jsonPath("$.statusTasks.length()").value(3));
     }
 
     @Test

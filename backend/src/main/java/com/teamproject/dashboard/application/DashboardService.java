@@ -89,6 +89,10 @@ public class DashboardService {
         LocalDateTime periodStart = periodFrom.atStartOfDay();
         LocalDateTime periodEnd = periodTo.atStartOfDay();
         List<Task> periodTasks = groupTasks.stream().filter(task -> occursInPeriod(task, periodStart, periodEnd)).toList();
+        var statusTasks = new LinkedHashMap<Long, Task>();
+        groupTasks.stream().filter(task -> task.getStatus() == Task.Status.REQUESTED)
+                .forEach(task -> statusTasks.put(task.getId(), task));
+        periodTasks.forEach(task -> statusTasks.put(task.getId(), task));
         StatusCounts statuses = statuses(groupTasks, periodTasks);
         List<Task> workflowTasks = groupTasks.stream()
                 .filter(task -> task.getStatus() == Task.Status.REQUESTED || periodTasks.contains(task))
@@ -127,6 +131,7 @@ public class DashboardService {
                 completedWithDue.size(), onTime,
                 completedWithDue.isEmpty() ? null : percent(onTime, completedWithDue.size()),
                 averageHours, memberMetrics, risks, periodTasks.stream().map(this::taskResponse).toList(),
+                statusTasks.values().stream().map(this::taskResponse).toList(),
                 calendars.list(userId, groupId, periodFrom, periodTo).items());
     }
 

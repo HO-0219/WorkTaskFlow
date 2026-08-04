@@ -19,6 +19,7 @@ export type GroupDashboard = {
   members: { memberId: number; userId: number; nickname: string; role: string; assignedCount: number; activeCount: number; completedCount: number; delayedCount: number; onTimeRatePercent?: number }[];
   riskTasks: DashboardTask[];
   periodTasks: DashboardTask[];
+  statusTasks: DashboardTask[];
   calendarItems: CalendarItem[];
 };
 export type MemberReport = {

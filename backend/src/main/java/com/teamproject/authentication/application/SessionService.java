@@ -17,6 +17,7 @@ import com.teamproject.authentication.domain.token.RefreshToken.ClientMode;
 import com.teamproject.authentication.domain.token.SessionDevice;
 import com.teamproject.authentication.application.dto.SessionDtos.DeviceSessionsResponse;
 import com.teamproject.notification.application.NotificationService;
+import com.teamproject.notification.application.PushSubscriptionService;
 import com.teamproject.admin.application.AdminMfaService;
 
 @Service
@@ -30,10 +31,11 @@ public class SessionService {
     private final boolean demoEnabled;
     private final String demoUsername;
     private final AdminMfaService adminMfa;
+    private final PushSubscriptionService pushSubscriptions;
 
     public SessionService(UserRepository users, PasswordEncoder passwordEncoder,
             RefreshTokenService refreshTokens, AccessSessionIssuer issuer, NotificationService notifications,
-            AdminMfaService adminMfa,
+            AdminMfaService adminMfa, PushSubscriptionService pushSubscriptions,
             @Value("${app.demo.enabled:true}") boolean demoEnabled,
             @Value("${app.demo.username:demo_leader}") String demoUsername) {
         this.users = users;
@@ -42,6 +44,7 @@ public class SessionService {
         this.issuer = issuer;
         this.notifications = notifications;
         this.adminMfa = adminMfa;
+        this.pushSubscriptions = pushSubscriptions;
         this.demoEnabled = demoEnabled;
         this.demoUsername = demoUsername;
     }
@@ -108,6 +111,7 @@ public class SessionService {
         User user = users.findById(userId).orElseThrow(() ->
                 new ApplicationException("USER_NOT_FOUND", HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
         refreshTokens.revokeAll(userId);
+        pushSubscriptions.unsubscribeAll(userId);
         user.invalidateSessions();
         securityLog.info("event=LOGOUT_ALL outcome=SUCCESS actorUserId={}", userId);
     }
@@ -126,6 +130,7 @@ public class SessionService {
     public boolean logoutSession(Long userId, String sessionId, String currentRawToken) {
         boolean current = sessionId.equals(refreshTokens.sessionId(currentRawToken));
         refreshTokens.revokeSession(userId, sessionId);
+        pushSubscriptions.unsubscribeAll(userId);
         securityLog.info("event=LOGOUT_DEVICE outcome=SUCCESS actorUserId={} sessionId={}", userId, sessionId);
         return current;
     }

@@ -105,8 +105,7 @@ public class CalendarService {
         LocalDateTime toUtc = to.atStartOfDay(zone).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
         events.findAllByGroupIdAndStartAtUtcLessThanAndEndAtUtcGreaterThanOrderByStartAtUtcAscIdAsc(
                 group.getId(), toUtc, fromUtc).stream().map(this::eventResponse).forEach(items::add);
-        tasks.findAllByGroupIdAndDueAtGreaterThanEqualAndDueAtLessThanOrderByDueAtAscIdAsc(
-                group.getId(), from.atStartOfDay(), to.atStartOfDay()).stream()
+        tasks.findAllTimelineTasks(group.getId(), from.atStartOfDay(), to.atStartOfDay()).stream()
                 .filter(task -> task.isCalendarDeadlineVisible(LocalDateTime.now(), rejectedTaskRetentionHours))
                 .map(this::taskResponse).forEach(items::add);
     }
@@ -120,19 +119,26 @@ public class CalendarService {
                 toInstant(event.getStartAtUtc()), toInstant(event.getEndAtUtc()), event.isAllDay(),
                 event.getLocation(), event.getCreatedBy().getId(), event.getVersion(),
                 event.getCreatedAt(), event.getUpdatedAt(),
-                event.getCreatedBy().getId(), event.getCreatedBy().getUser().getNickname());
+                event.getCreatedBy().getId(), event.getCreatedBy().getUser().getNickname(),
+                null, false, null, null);
     }
 
     private CalendarItemResponse taskResponse(Task task) {
         Group group = task.getGroup();
         ZoneId zone = zone(group);
+        LocalDateTime timelineStart = task.getStartAt() == null ? task.getCreatedAt() : task.getStartAt();
+        if (timelineStart.isAfter(task.getDueAt())) timelineStart = task.getCreatedAt();
+        Instant startUtc = timelineStart.atZone(zone).toInstant();
         Instant dueUtc = task.getDueAt().atZone(zone).toInstant();
         GroupMember owner = task.getAssignee() == null ? task.getRequester() : task.getAssignee();
         return new CalendarItemResponse("TASK_DEADLINE", null, task.getId(), group.getId(), group.getName(),
                 group.getType().name(), group.getTimezone(), "DEADLINE", task.getTitle(), task.getDescription(),
-                task.getDueAt(), task.getDueAt(), dueUtc, dueUtc, false, null,
+                timelineStart, task.getDueAt(), startUtc, dueUtc, false, null,
                 task.getRequester().getId(), task.getVersion(), task.getCreatedAt(), task.getUpdatedAt(),
-                owner.getId(), owner.getUser().getNickname());
+                owner.getId(), owner.getUser().getNickname(), task.getStatus().name(),
+                task.isDelayed(LocalDateTime.now(zone)),
+                task.getAssignee() == null ? null : task.getAssignee().getId(),
+                task.getAssignee() == null ? null : task.getAssignee().getUser().getNickname());
     }
 
     private GroupMember requireEditor(Long groupId, Long userId) {

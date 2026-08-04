@@ -97,7 +97,7 @@ class CalendarApiTest {
     }
 
     @Test
-    void taskDeadlineIsComposedWithoutCopyAndMovesImmediatelyAfterTaskUpdate() throws Exception {
+    void taskTimelineSpansFromCreationOrStartThroughItsDueDate() throws Exception {
         Team team = team("deadline", "Asia/Seoul");
         long taskId = createTask(team.memberToken(), team.groupId(), "마감 업무", "2026-08-05T18:00:00");
 
@@ -108,21 +108,25 @@ class CalendarApiTest {
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].source").value("TASK_DEADLINE"))
                 .andExpect(jsonPath("$.items[0].sourceTaskId").value(taskId))
-                .andExpect(jsonPath("$.items[0].startAtUtc").value("2026-08-05T09:00:00Z"));
+                .andExpect(jsonPath("$.items[0].startAt").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].endAt").value("2026-08-05T18:00:00"))
+                .andExpect(jsonPath("$.items[0].taskStatus").value("REQUESTED"))
+                .andExpect(jsonPath("$.items[0].taskAssigneeMemberId").doesNotExist());
 
         mvc.perform(patch("/api/v1/tasks/{taskId}", taskId)
                         .header("Authorization", bearer(team.memberToken())).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dueAt\":\"2026-09-03T12:00:00\",\"expectedVersion\":0}"))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/v1/calendars/events").param("groupId", String.valueOf(team.groupId()))
-                        .param("from", "2026-08-01").param("to", "2026-09-01")
+                .param("from", "2026-08-01").param("to", "2026-09-01")
                         .header("Authorization", bearer(team.ownerToken())))
-                .andExpect(jsonPath("$.items.length()").value(0));
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].endAt").value("2026-09-03T12:00:00"));
         mvc.perform(get("/api/v1/calendars/events").param("groupId", String.valueOf(team.groupId()))
                         .param("from", "2026-09-01").param("to", "2026-10-01")
-                        .header("Authorization", bearer(team.ownerToken())))
+                .header("Authorization", bearer(team.ownerToken())))
                 .andExpect(jsonPath("$.items[0].sourceTaskId").value(taskId))
-                .andExpect(jsonPath("$.items[0].startAt").value("2026-09-03T12:00:00"));
+                .andExpect(jsonPath("$.items[0].endAt").value("2026-09-03T12:00:00"));
     }
 
     @Test

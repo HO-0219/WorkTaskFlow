@@ -5,6 +5,7 @@ import com.teamproject.authentication.domain.token.OneTimeTokenRepository;
 import com.teamproject.authentication.domain.token.RefreshToken;
 import com.teamproject.authentication.domain.token.RefreshTokenRepository;
 import com.teamproject.common.exception.ApplicationException;
+import com.teamproject.notification.application.PushSubscriptionService;
 import com.teamproject.user.application.dto.UserAccountDtos.ChangePasswordRequest;
 import com.teamproject.user.application.dto.UserAccountDtos.WithdrawRequest;
 import com.teamproject.user.domain.User;
@@ -26,15 +27,17 @@ public class UserAccountService {
     private final RefreshTokenRepository refreshTokens;
     private final OneTimeTokenRepository oneTimeTokens;
     private final SocialAccountRepository socialAccounts;
+    private final PushSubscriptionService pushSubscriptions;
 
     public UserAccountService(UserRepository users, PasswordEncoder passwordEncoder,
             RefreshTokenRepository refreshTokens, OneTimeTokenRepository oneTimeTokens,
-            SocialAccountRepository socialAccounts) {
+            SocialAccountRepository socialAccounts, PushSubscriptionService pushSubscriptions) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokens = refreshTokens;
         this.oneTimeTokens = oneTimeTokens;
         this.socialAccounts = socialAccounts;
+        this.pushSubscriptions = pushSubscriptions;
     }
 
     @Transactional
@@ -52,6 +55,7 @@ public class UserAccountService {
         user.changePassword(passwordEncoder.encode(request.newPassword()));
         user.invalidateSessions();
         revokeAllRefreshTokens(userId);
+        pushSubscriptions.unsubscribeAll(userId);
     }
 
     @Transactional
@@ -67,6 +71,7 @@ public class UserAccountService {
 
         String originalEmail = user.getEmail();
         revokeAllRefreshTokens(userId);
+        pushSubscriptions.unsubscribeAll(userId);
         oneTimeTokens.deleteAllByEmailIgnoreCase(originalEmail);
         socialAccounts.deleteAllByUserId(userId);
         String suffix = userId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);

@@ -33,5 +33,7 @@ public class UserConsent {
         this.agreedAt = LocalDateTime.now();
     }
 
+    public boolean isAgreed() { return agreed; }
+
     public enum Type { TERMS, PRIVACY_COLLECTION, AGE_14_OR_OLDER, SERVICE_NOTIFICATIONS, MARKETING_MESSAGES }
 }

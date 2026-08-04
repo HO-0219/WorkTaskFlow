@@ -24,6 +24,10 @@ export type CalendarItem = {
   updatedAt: string;
   ownerMemberId?: number;
   ownerNickname?: string;
+  taskStatus?: string;
+  taskDelayed: boolean;
+  taskAssigneeMemberId?: number;
+  taskAssigneeNickname?: string;
 };
 
 export type CalendarEventBody = {

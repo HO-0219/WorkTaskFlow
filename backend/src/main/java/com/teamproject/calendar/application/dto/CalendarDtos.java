@@ -38,7 +38,9 @@ public final class CalendarDtos {
             LocalDateTime startAt, LocalDateTime endAt, Instant startAtUtc, Instant endAtUtc,
             boolean allDay, String location, Long createdByMemberId, Long version,
             LocalDateTime createdAt, LocalDateTime updatedAt,
-            Long ownerMemberId, String ownerNickname) {}
+            Long ownerMemberId, String ownerNickname,
+            String taskStatus, boolean taskDelayed,
+            Long taskAssigneeMemberId, String taskAssigneeNickname) {}
 
     public record CalendarResponse(List<CalendarItemResponse> items, String from, String to) {}
 }
