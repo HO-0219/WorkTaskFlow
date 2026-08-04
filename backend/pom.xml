@@ -17,6 +17,11 @@
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <testcontainers.version>2.0.3</testcontainers.version>
+        <!-- Spring Boot BOM은 commons-lang3 3.14.0을 고정하지만, Testcontainers 2.x가 끌어오는
+             commons-compress 1.28.0의 TarArchiveEntry는 3.18.0에 추가된
+             SystemProperties.getUserName(String)을 호출한다. 낮은 버전이 이기면 NoSuchMethodError가 난다.
+             commons-lang3은 test 스코프에만 존재하므로 운영 아티팩트에는 영향이 없다. -->
+        <commons-lang3.version>3.18.0</commons-lang3.version>
         <openai-java.version>4.45.0</openai-java.version>
         <openhtmltopdf.version>1.1.8</openhtmltopdf.version>
         <json-schema-validator.version>1.5.2</json-schema-validator.version>
