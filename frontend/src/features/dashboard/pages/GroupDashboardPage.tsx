@@ -6,6 +6,7 @@ import { taskApi, TaskPriority } from '../../../api/taskApi';
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { groupApi, GroupResponse } from '../../../api/groupApi';
 import { AiWeeklyReportAction } from '../../report/components/AiWeeklyReportAction';
+import { ChecklistDraftField, cleanChecklistDraft } from '../../task/components/ChecklistDraftField';
 import { useLanguage } from '../../../app/LanguageContext';
 
 const statusLabels: Record<string, [string, string]> = { requested: ['승인 대기', 'Pending approval'], todo: ['할 일', 'To do'], inProgress: ['진행 중', 'In progress'], onHold: ['보류', 'On hold'], completed: ['완료', 'Completed'], rejected: ['반려', 'Rejected'], cancelled: ['취소', 'Cancelled'], delayed: ['지연', 'Overdue'] };
@@ -34,6 +35,7 @@ export function GroupDashboardPage() {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('NORMAL');
   const [dueAt, setDueAt] = useState('');
+  const [checklistItems, setChecklistItems] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [createError, setCreateError] = useState('');
   const [reportScope, setReportScope] = useState<ReportScope>('MY');
@@ -63,8 +65,9 @@ export function GroupDashboardPage() {
     event.preventDefault();
     setSaving(true); setCreateError('');
     try {
-      await taskApi.create(groupId, { title: title.trim(), description: description.trim() || undefined, priority, dueAt: dueAt || undefined });
-      setTitle(''); setDescription(''); setPriority('NORMAL'); setDueAt(''); setShowCreate(false);
+      const checklist = cleanChecklistDraft(checklistItems);
+      await taskApi.create(groupId, { title: title.trim(), description: description.trim() || undefined, priority, dueAt: dueAt || undefined, checklistItems: checklist.length > 0 ? checklist : undefined });
+      setTitle(''); setDescription(''); setPriority('NORMAL'); setDueAt(''); setChecklistItems([]); setShowCreate(false);
       window.dispatchEvent(new Event('notifications:refresh'));
       const current = new Date();
       const periodChanged = year !== current.getFullYear() || month !== current.getMonth() + 1 || week !== 0;
@@ -123,6 +126,7 @@ export function GroupDashboardPage() {
       <label className="field"><span>{t('설명 (선택)', 'Description (optional)')}</span><textarea maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       <label className="field"><span>{t('우선순위', 'Priority')}</span><select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>{Object.entries(priorityLabels).map(([value, valueLabel]) => <option value={value} key={value}>{label(valueLabel)}</option>)}</select></label>
       <label className="field"><span>{t('마감 날짜·시간 (선택)', 'Due date and time (optional)')}</span><input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /><small className="field-help">{t('시간이 필요한 업무는 시각까지 지정할 수 있습니다.', 'Add a specific time when needed.')}</small></label>
+      <ChecklistDraftField items={checklistItems} onChange={setChecklistItems} disabled={saving} />
       {createError && <p className="error">{createError}</p>}
       <div className="modal-actions"><button className="secondary" type="button" disabled={saving} onClick={() => setShowCreate(false)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving || !title.trim()}>{saving ? t('등록 중...', 'Creating...') : t('업무 만들기', 'Create task')}</button></div>
     </form></Modal>}

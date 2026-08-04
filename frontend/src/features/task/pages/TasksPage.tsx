@@ -5,6 +5,7 @@ import { groupApi, GroupResponse } from '../../../api/groupApi';
 import { taskApi, TaskPriority, TaskResponse } from '../../../api/taskApi';
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
+import { ChecklistDraftField, cleanChecklistDraft } from '../components/ChecklistDraftField';
 
 const statusLabels: Record<TaskResponse['status'], [string, string]> = {
   REQUESTED: ['승인 대기', 'Pending approval'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'],
@@ -24,6 +25,7 @@ export function TasksPage() {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('NORMAL');
   const [dueAt, setDueAt] = useState('');
+  const [checklistItems, setChecklistItems] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -47,14 +49,17 @@ export function TasksPage() {
     setSaving(true);
     setError('');
     try {
+      const checklist = cleanChecklistDraft(checklistItems);
       const created = await taskApi.create(groupId, {
         title, description: description || undefined, priority, dueAt: dueAt || undefined,
+        checklistItems: checklist.length > 0 ? checklist : undefined,
       });
       setTasks((current) => [created, ...current]);
       setTitle('');
       setDescription('');
       setPriority('NORMAL');
       setDueAt('');
+      setChecklistItems([]);
       setShowCreate(false);
       window.dispatchEvent(new Event('notifications:refresh'));
     } catch (caught) {
@@ -118,6 +123,7 @@ export function TasksPage() {
         <label className="field"><span>{t('설명 (선택)', 'Description (optional)')}</span><textarea maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
         <label className="field"><span>{t('우선순위', 'Priority')}</span><select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>{Object.entries(priorityLabels).map(([value, valueLabel]) => <option value={value} key={value}>{label(valueLabel)}</option>)}</select></label>
         <label className="field"><span>{t('마감 날짜·시간 (선택)', 'Due date and time (optional)')}</span><input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /><small className="field-help">{t('시간이 필요한 업무는 시각까지 지정할 수 있습니다.', 'Add a specific time when the task requires one.')}</small></label>
+        <ChecklistDraftField items={checklistItems} onChange={setChecklistItems} disabled={saving} />
         <div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowCreate(false)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving}>{saving ? t('등록 중...', 'Creating...') : t('업무 만들기', 'Create task')}</button></div>
       </form></Modal>}
     </section>
