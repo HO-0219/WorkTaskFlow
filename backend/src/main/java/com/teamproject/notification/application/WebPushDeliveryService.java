@@ -9,6 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.Security;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
+import org.apache.http.HttpResponse;
+import org.apache.http.util.EntityUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +57,10 @@ public class WebPushDeliveryService {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void deliver(PushNotificationEvent event) {
-        if (pushService == null) return;
+        if (pushService == null) {
+            log.debug("Web Push is not configured; skipping delivery for user {}", event.userId());
+            return;
+        }
         byte[] payload;
         try {
             payload = objectMapper.writeValueAsString(new Payload(
@@ -65,7 +70,12 @@ public class WebPushDeliveryService {
             log.warn("Could not serialize Web Push payload for user {}", event.userId(), exception);
             return;
         }
-        for (PushSubscription subscription : subscriptions.findAllByUserId(event.userId())) {
+        var targets = subscriptions.findAllByUserId(event.userId());
+        if (targets.isEmpty()) {
+            log.debug("No push subscription registered for user {}", event.userId());
+            return;
+        }
+        for (PushSubscription subscription : targets) {
             send(subscription, payload);
         }
     }
@@ -75,14 +85,35 @@ public class WebPushDeliveryService {
             var response = pushService.send(new Notification(subscription.getEndpoint(),
                     subscription.getP256dhKey(), subscription.getAuthSecret(), payload));
             int status = response.getStatusLine().getStatusCode();
-            if (status == 404 || status == 410) subscriptions.deleteById(subscription.getId());
-            else if (status < 200 || status >= 300) {
-                log.warn("Web Push provider returned status {} for subscription {}", status, subscription.getId());
+            // 403은 구독이 만들어질 때 쓰인 VAPID 키와 서명 키가 달라진 경우다. 남겨 두면 계속 실패하므로 함께 정리한다.
+            if (status == 403 || status == 404 || status == 410) {
+                log.warn("Dropping push subscription {} after provider status {}: {}",
+                        subscription.getId(), status, reason(response));
+                subscriptions.deleteById(subscription.getId());
+            } else if (status < 200 || status >= 300) {
+                log.warn("Web Push provider returned status {} for subscription {}: {}",
+                        status, subscription.getId(), reason(response));
+            } else {
+                log.debug("Web Push delivered to subscription {}", subscription.getId());
             }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
         } catch (Exception exception) {
             log.warn("Web Push delivery failed for subscription {}", subscription.getId(), exception);
+        } catch (LinkageError error) {
+            // web-push가 기대하는 BouncyCastle 버전과 어긋나면 Error로 떨어져 Exception 처리에 걸리지 않는다.
+            log.error("Web Push delivery aborted for subscription {} by a dependency mismatch",
+                    subscription.getId(), error);
+        }
+    }
+
+    // 푸시 제공자는 거절 사유를 본문에 담아 보낸다. 이게 없으면 상태 코드만으로 원인을 좁힐 수 없다.
+    private String reason(HttpResponse response) {
+        try {
+            String body = response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity());
+            return body.isBlank() ? "no response body" : body.strip();
+        } catch (Exception exception) {
+            return "unreadable response body";
         }
     }
 

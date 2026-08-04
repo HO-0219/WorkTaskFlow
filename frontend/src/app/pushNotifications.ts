@@ -12,10 +12,11 @@ export async function inspectPushNotifications(): Promise<PushSetupResult> {
   const registration = await pwaRegistration();
   if (!registration) return { state: 'hidden', consentAgreed: config.consentAgreed };
   const existing = await registration.pushManager.getSubscription();
-  if (existing) {
+  if (existing && matchesServerKey(existing, config.publicKey)) {
     await saveSubscription(existing);
     return { state: 'enabled', consentAgreed: true };
   }
+  if (existing) await discardSubscription(existing);
   if (Notification.permission === 'granted') {
     await createSubscription(registration, config.publicKey);
     return { state: 'enabled', consentAgreed: true };
@@ -34,8 +35,11 @@ export async function enablePushNotifications(): Promise<PushSetupResult> {
   const registration = await pwaRegistration();
   if (!registration) return { state: 'error', consentAgreed: config.consentAgreed };
   const existing = await registration.pushManager.getSubscription();
-  if (existing) await saveSubscription(existing);
-  else await createSubscription(registration, config.publicKey);
+  if (existing && matchesServerKey(existing, config.publicKey)) await saveSubscription(existing);
+  else {
+    if (existing) await discardSubscription(existing);
+    await createSubscription(registration, config.publicKey);
+  }
   return { state: 'enabled', consentAgreed: true };
 }
 
@@ -50,6 +54,21 @@ export async function disablePushForCurrentDevice() {
 
 function supportsPush() {
   return 'Notification' in window && 'PushManager' in window && 'serviceWorker' in navigator;
+}
+
+// 서버 VAPID 키가 바뀌면 남아 있는 구독으로는 발송이 403으로 영구 실패한다. 키가 다르면 버리고 다시 만든다.
+function matchesServerKey(subscription: PushSubscription, publicKey: string) {
+  const applied = subscription.options.applicationServerKey;
+  if (!applied) return false;
+  const current = base64UrlToBytes(publicKey);
+  const stored = new Uint8Array(applied);
+  return stored.length === current.length && stored.every((byte, index) => byte === current[index]);
+}
+
+async function discardSubscription(subscription: PushSubscription) {
+  try { await notificationApi.unsubscribePush(subscription.endpoint); }
+  catch { /* 서버 정리는 실패해도 발송 시 403 응답으로 정리된다. */ }
+  await subscription.unsubscribe();
 }
 
 async function createSubscription(registration: ServiceWorkerRegistration, publicKey: string) {
