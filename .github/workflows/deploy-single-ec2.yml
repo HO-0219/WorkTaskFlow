@@ -46,6 +46,9 @@ jobs:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           TOSS_CLIENT_KEY: ${{ secrets.TOSS_CLIENT_KEY }}
           TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
           PAYMENT_ENCRYPTION_KEY_BASE64: ${{ secrets.PAYMENT_ENCRYPTION_KEY_BASE64 }}
@@ -59,6 +62,7 @@ jobs:
             MYSQL_APP_PASSWORD MYSQL_ROOT_PASSWORD
             JWT_SECRET OAUTH2_GOOGLE_CLIENT_ID OAUTH2_GOOGLE_CLIENT_SECRET
             MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD MAIL_FROM
+            VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT
             TOSS_CLIENT_KEY TOSS_SECRET_KEY PAYMENT_ENCRYPTION_KEY_BASE64
           )
           for name in "${required_variables[@]}"; do
@@ -87,6 +91,18 @@ jobs:
           }
           [[ "$TLS_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || {
             echo "::error::TLS_EMAIL must be a valid contact email."
+            exit 1
+          }
+          [[ "$VAPID_PUBLIC_KEY" =~ ^[A-Za-z0-9_-]+$ && ${#VAPID_PUBLIC_KEY} -eq 87 ]] || {
+            echo "::error::VAPID_PUBLIC_KEY must be a valid 87-character base64url public key."
+            exit 1
+          }
+          [[ "$VAPID_PRIVATE_KEY" =~ ^[A-Za-z0-9_-]+$ && ${#VAPID_PRIVATE_KEY} -eq 43 ]] || {
+            echo "::error::VAPID_PRIVATE_KEY must be a valid 43-character base64url private key."
+            exit 1
+          }
+          [[ "$VAPID_SUBJECT" == mailto:* || "$VAPID_SUBJECT" == https://* ]] || {
+            echo "::error::VAPID_SUBJECT must start with mailto: or https://."
             exit 1
           }
           [[ "$TOSS_CLIENT_KEY" == test_ck_* || "$TOSS_CLIENT_KEY" == test_gck_* ]] || {
@@ -164,6 +180,9 @@ jobs:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           TOSS_CLIENT_KEY: ${{ secrets.TOSS_CLIENT_KEY }}
           TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
           PAYMENT_ENCRYPTION_KEY_BASE64: ${{ secrets.PAYMENT_ENCRYPTION_KEY_BASE64 }}
@@ -221,6 +240,9 @@ jobs:
           write_env MAIL_FROM "$MAIL_FROM"
           write_env MAIL_SMTP_AUTH true
           write_env MAIL_STARTTLS true
+          write_env VAPID_PUBLIC_KEY "$VAPID_PUBLIC_KEY"
+          write_env VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
+          write_env VAPID_SUBJECT "$VAPID_SUBJECT"
           write_env STORAGE_PROVIDER local
           write_env UPLOAD_LOCAL_ROOT /var/lib/totaskflow/uploads
           write_env OPENAI_API_KEY "$OPENAI_API_KEY"
