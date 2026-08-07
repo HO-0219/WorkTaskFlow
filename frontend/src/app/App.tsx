@@ -28,6 +28,7 @@ import { isRunningStandalone } from './pwa';
 import { SessionKeepAlive } from './SessionKeepAlive';
 import { AdminPage } from '../features/admin/AdminPage';
 import { DemoPage } from './DemoPage';
+import { AiAssistantPage } from '../features/assistant/AiAssistantPage';
 
 export default function App() {
   return <LanguageProvider><BrowserRouter>
@@ -59,6 +60,7 @@ export default function App() {
     <Route path="/groups/:groupId/tasks" element={<TasksPage />} />
     <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
+    <Route path="/assistant" element={<AiAssistantPage />} />
     <Route path="/calendar" element={<CalendarPage />} />
     <Route path="/groups/:groupId/dashboard" element={<GroupDashboardPage />} />
     <Route path="/group-invitations/accept" element={<InvitationAcceptPage />} />
@@ -105,7 +107,7 @@ function RouteAnnouncer() {
 
 function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (language === 'en') {
-    if (pathname === '/') return 'toesa'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts';
+    if (pathname === '/') return 'toesa'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts'; if (pathname === '/assistant') return 'AI assistant';
     if (pathname === '/demo') return 'Product demo';
     if (pathname === '/groups') return 'Groups'; if (pathname === '/profile') return 'Profile'; if (pathname === '/account') return 'Account settings';
     if (pathname === '/payments') return 'Payments'; if (pathname === '/admin') return 'Admin';
@@ -121,6 +123,7 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (pathname === '/app') return '내 대시보드';
   if (pathname === '/calendar') return '캘린더';
   if (pathname === '/notifications') return '알림';
+  if (pathname === '/assistant') return 'AI 업무 비서';
   if (/^\/groups\/\d+\/dashboard$/.test(pathname)) return '그룹 대시보드';
   if (/^\/groups\/\d+\/members$/.test(pathname)) return '팀원 목록';
   if (/^\/groups\/\d+\/tasks$/.test(pathname)) return '업무 목록';

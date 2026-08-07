@@ -129,11 +129,10 @@ public class NotificationService {
     @Transactional
     public void subscriptionRollout(User user, com.teamproject.group.domain.Group group,
             String eventKey, LocalDateTime deadline) {
-        if (notifications.existsByRecipientIdAndEventKey(user.getId(), eventKey)) return;
-        publish(notifications.save(new Notification(user, null, group, null, null,
+        insertAndPublish(new Notification(user, null, group, null, null,
                 Notification.Type.SUBSCRIPTION_ROLLOUT_NOTICE, eventKey,
                 "유료 구독 전환 사전 안내",
-                deadline.toLocalDate() + "까지 무료 유지 또는 유료 구독 전환 여부를 선택해 주세요.")));
+                deadline.toLocalDate() + "까지 무료 유지 또는 유료 구독 전환 여부를 선택해 주세요."));
     }
 
     @Transactional(readOnly = true)
@@ -189,18 +188,27 @@ public class NotificationService {
                 && rawRecipients.stream().anyMatch(member -> member.getUser().getId().equals(actor.getId()))) {
             recipients.put(actor.getId(), actor);
         }
-        notifications.saveAll(recipients.values().stream()
-                .filter(recipient -> !notifications.existsByRecipientIdAndEventKey(recipient.getId(), eventKey))
-                .map(recipient -> new Notification(
-                        recipient, actor, task.getGroup(), task, comment, type, eventKey, title, message))
-                .toList()).forEach(this::publish);
+        recipients.values().forEach(recipient -> insertAndPublish(new Notification(
+                recipient, actor, task.getGroup(), task, comment, type, eventKey, title, message)));
     }
 
     private void createSecurity(User recipient, Notification.Type type, String eventKey,
             String title, String message) {
-        if (!notifications.existsByRecipientIdAndEventKey(recipient.getId(), eventKey)) {
-            publish(notifications.save(Notification.security(recipient, type, eventKey, title, message)));
-        }
+        insertAndPublish(Notification.security(recipient, type, eventKey, title, message));
+    }
+
+    private void insertAndPublish(Notification notification) {
+        int inserted = notifications.insertIgnore(
+                notification.getRecipient().getId(),
+                notification.getActor() == null ? null : notification.getActor().getId(),
+                notification.getGroup() == null ? null : notification.getGroup().getId(),
+                notification.getTask() == null ? null : notification.getTask().getId(),
+                notification.getComment() == null ? null : notification.getComment().getId(),
+                notification.getType().name(), notification.getEventKey(),
+                notification.getTitle(), notification.getMessage(), notification.getCreatedAt());
+        if (inserted == 0) return;
+        publish(notifications.findByRecipientIdAndEventKey(
+                notification.getRecipient().getId(), notification.getEventKey()).orElseThrow());
     }
 
     private void publish(Notification notification) {

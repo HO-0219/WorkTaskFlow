@@ -34,6 +34,9 @@ services:
       TOSS_TEST_MODE: "true"
       MAIL_ENABLED: "false"
       DEMO_ENABLED: "false"
+      AI_ASSISTANT_ENABLED: ${AI_ASSISTANT_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_ASSISTANT_MODEL: ${AI_ASSISTANT_MODEL:-gpt-5.6-sol}
     depends_on:
       mysql:
         condition: service_healthy

@@ -47,6 +47,7 @@ public class SensitiveEndpointRateLimitFilter extends OncePerRequestFilter {
                 && !path.startsWith("/api/v1/payments")
                 && !path.startsWith("/api/v1/auth/password-resets")
                 && !path.startsWith("/api/v1/auth/email-verifications")
+                && !path.equals("/api/v1/assistant/messages")
                 // AI 리포트 생성은 한 번이 유료 provider 호출이다. 서버 상한은 (그룹, 기간,
                 // 언어)당 3회뿐이라 과거 기간을 순회하면 호출 수에 제한이 없다.
                 && !AI_REPORT_GENERATION.matcher(path).matches();

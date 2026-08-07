@@ -28,13 +28,14 @@ class OpenAiReportConfigurationTest {
             .withUserConfiguration(OpenAIConfiguration.class);
 
     @Test
-    @DisplayName("API 키가 없어도 context가 기동하고 openAiReportClient Bean이 하나 만들어진다")
+    @DisplayName("API 키가 없어도 context가 기동하고 용도별 OpenAI client Bean이 만들어진다")
     void startsWithoutApiKey() {
         runner.run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context).hasSingleBean(OpenAIClient.class);
             assertThat(context.getBeanNamesForType(OpenAIClient.class))
-                    .containsExactly("openAiReportClient");
+                    .containsExactlyInAnyOrder("openAiReportClient", "openAiAssistantClient");
+            assertThat(context.getBean("openAiReportClient", OpenAIClient.class)).isNotNull();
+            assertThat(context.getBean("openAiAssistantClient", OpenAIClient.class)).isNotNull();
         });
     }
 
@@ -88,7 +89,8 @@ class OpenAiReportConfigurationTest {
                     assertThat(properties.model()).isEmpty();
                     assertThat(properties.hasApiKey()).isFalse();
                     assertThat(properties.hasModel()).isFalse();
-                    assertThat(context).hasSingleBean(OpenAIClient.class);
+                    assertThat(context.getBeanNamesForType(OpenAIClient.class))
+                            .containsExactlyInAnyOrder("openAiReportClient", "openAiAssistantClient");
                 });
     }
 

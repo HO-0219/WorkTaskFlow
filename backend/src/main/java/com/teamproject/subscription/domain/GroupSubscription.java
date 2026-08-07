@@ -23,6 +23,8 @@ public class GroupSubscription {
     private LocalDateTime currentPeriodStart;
     private LocalDateTime currentPeriodEnd;
     private LocalDateTime nextBillingAt;
+    @Column(length = 160) private String billingClaimKey;
+    private LocalDateTime billingClaimedAt;
     private LocalDateTime cancelledAt;
     private LocalDateTime lastBillingAttemptAt;
     private LocalDateTime pastDueSince;
@@ -54,11 +56,13 @@ public class GroupSubscription {
         paymentMethod = method; status = Status.ACTIVE; conversionChoice = ConversionChoice.CONTINUE_PAID;
         currentPeriodStart = now; currentPeriodEnd = now.plusMonths(1); nextBillingAt = currentPeriodEnd;
         cancelledAt = null; pastDueSince = null; consecutiveFailures = 0; lastBillingAttemptAt = now; updatedAt = now;
+        clearBillingClaim();
     }
     public void cancelAtPeriodEnd(LocalDateTime now) { status = Status.CANCEL_AT_PERIOD_END; cancelledAt = now; updatedAt = now; }
     public void cancelToFree(LocalDateTime now) {
         status = Status.FREE; paymentMethod = null; currentPeriodStart = null; currentPeriodEnd = null;
         nextBillingAt = null; cancelledAt = now; pastDueSince = null; consecutiveFailures = 0; updatedAt = now;
+        clearBillingClaim();
     }
     public void markPastDue(LocalDateTime now) {
         status = Status.PAST_DUE;
@@ -66,7 +70,7 @@ public class GroupSubscription {
         consecutiveFailures++;
         lastBillingAttemptAt = now;
         nextBillingAt = now.plusDays(consecutiveFailures >= 3 ? 3 : 1);
-        updatedAt = now;
+        updatedAt = now; clearBillingClaim();
     }
     public void renew(LocalDateTime now) {
         status = Status.ACTIVE;
@@ -76,8 +80,17 @@ public class GroupSubscription {
         lastBillingAttemptAt = now;
         pastDueSince = null;
         consecutiveFailures = 0;
+        updatedAt = now; clearBillingClaim();
+    }
+    public void claimBilling(String claimKey, LocalDateTime now) {
+        if (billingClaimKey != null && !billingClaimKey.equals(claimKey)) {
+            throw new IllegalStateException("A billing claim is already active.");
+        }
+        billingClaimKey = claimKey;
+        billingClaimedAt = now;
         updatedAt = now;
     }
+    public void clearBillingClaim() { billingClaimKey = null; billingClaimedAt = null; }
     public Long getId() { return id; }
     public Group getGroup() { return group; }
     public User getSubscriber() { return subscriber; }
@@ -92,6 +105,8 @@ public class GroupSubscription {
     public LocalDateTime getCurrentPeriodStart() { return currentPeriodStart; }
     public LocalDateTime getCurrentPeriodEnd() { return currentPeriodEnd; }
     public LocalDateTime getNextBillingAt() { return nextBillingAt; }
+    public String getBillingClaimKey() { return billingClaimKey; }
+    public LocalDateTime getBillingClaimedAt() { return billingClaimedAt; }
     public LocalDateTime getCancelledAt() { return cancelledAt; }
     public LocalDateTime getLastBillingAttemptAt() { return lastBillingAttemptAt; }
     public LocalDateTime getPastDueSince() { return pastDueSince; }

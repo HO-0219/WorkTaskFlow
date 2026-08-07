@@ -187,6 +187,8 @@ jobs:
           TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
           PAYMENT_ENCRYPTION_KEY_BASE64: ${{ secrets.PAYMENT_ENCRYPTION_KEY_BASE64 }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_ASSISTANT_ENABLED: ${{ secrets.AI_ASSISTANT_ENABLED }}
+          AI_ASSISTANT_MODEL: ${{ secrets.AI_ASSISTANT_MODEL }}
         run: |
           set -euo pipefail
           install -d -m 700 "$HOME/.ssh"
@@ -253,6 +255,8 @@ jobs:
           else
             write_env AI_REPORT_ENABLED false
           fi
+          write_env AI_ASSISTANT_ENABLED "${AI_ASSISTANT_ENABLED:-false}"
+          write_env AI_ASSISTANT_MODEL "${AI_ASSISTANT_MODEL:-gpt-5.6-sol}"
           write_env TOSS_CLIENT_KEY "$TOSS_CLIENT_KEY"
           write_env TOSS_SECRET_KEY "$TOSS_SECRET_KEY"
           write_env PAYMENT_ENCRYPTION_KEY_BASE64 "$PAYMENT_ENCRYPTION_KEY_BASE64"

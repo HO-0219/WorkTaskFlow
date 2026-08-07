@@ -13,6 +13,7 @@ import com.teamproject.report.infrastructure.openai.contract.AiWeeklyReportAnaly
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,7 @@ public class OpenAiWeeklyReportGateway implements AiWeeklyReportGateway {
     private final OpenAiAnalysisContractMapper mapper;
 
     public OpenAiWeeklyReportGateway(
-            OpenAIClient client,
+            @Qualifier("openAiReportClient") OpenAIClient client,
             OpenAiReportProperties properties,
             ObjectMapper objectMapper,
             OpenAiAnalysisContractMapper mapper

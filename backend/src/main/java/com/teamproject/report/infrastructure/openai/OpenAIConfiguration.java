@@ -5,6 +5,7 @@ import com.openai.client.okhttp.OpenAIOkHttpClient;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.teamproject.assistant.infrastructure.openai.OpenAiAssistantProperties;
 
 /**
  * 공식 OpenAI Java SDK 클라이언트를 애플리케이션당 하나의 singleton Bean으로 등록한다.
@@ -21,7 +22,7 @@ import org.springframework.context.annotation.Configuration;
  * {@code @Qualifier}로 주입받고 있으므로 그대로 유지한다.
  */
 @Configuration
-@EnableConfigurationProperties(OpenAiReportProperties.class)
+@EnableConfigurationProperties({OpenAiReportProperties.class, OpenAiAssistantProperties.class})
 public class OpenAIConfiguration {
 
     /** 키가 없을 때 SDK builder를 통과시키기 위한 값. 실제 호출은 adapter가 먼저 막는다. */
@@ -34,6 +35,18 @@ public class OpenAIConfiguration {
                 .baseUrl(properties.baseUrl())
                 .timeout(properties.requestTimeout())
                 .maxRetries(properties.maxRetries())
+                .responseValidation(true)
+                .build();
+    }
+
+    @Bean("openAiAssistantClient")
+    OpenAIClient openAiAssistantClient(OpenAiReportProperties reportProperties,
+            OpenAiAssistantProperties assistantProperties) {
+        return OpenAIOkHttpClient.builder()
+                .apiKey(reportProperties.hasApiKey() ? reportProperties.apiKey() : UNCONFIGURED_API_KEY)
+                .baseUrl(reportProperties.baseUrl())
+                .timeout(assistantProperties.requestTimeout())
+                .maxRetries(1)
                 .responseValidation(true)
                 .build();
     }

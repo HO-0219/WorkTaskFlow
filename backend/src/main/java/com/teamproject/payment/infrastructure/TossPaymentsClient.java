@@ -53,6 +53,25 @@ public class TossPaymentsClient {
                 "orderName", orderName), idempotencyKey);
     }
 
+    public ApiResult findPaymentByOrderId(String orderId) {
+        try {
+            String response = client.get().uri("/v1/payments/orders/{orderId}", orderId)
+                    .header("Authorization", basicAuthorization())
+                    .header("Accept-Language", "ko")
+                    .retrieve().body(String.class);
+            return new ApiResult(200, parse(response), null, null);
+        } catch (RestClientResponseException exception) {
+            JsonNode error = parse(exception.getResponseBodyAsString());
+            JsonNode nested = error.path("error").isObject() ? error.path("error") : error;
+            return new ApiResult(exception.getStatusCode().value(), error,
+                    text(nested, "code", "TOSS_API_ERROR"),
+                    text(nested, "message", "토스페이먼츠 결제 조회에 실패했습니다."));
+        } catch (RuntimeException exception) {
+            return new ApiResult(null, mapper.createObjectNode(), "TOSS_NETWORK_ERROR",
+                    "토스페이먼츠 서버와 통신하지 못했습니다.");
+        }
+    }
+
     private ApiResult post(String path, Object body, String idempotencyKey) {
         try {
             String response = client.post().uri(path)

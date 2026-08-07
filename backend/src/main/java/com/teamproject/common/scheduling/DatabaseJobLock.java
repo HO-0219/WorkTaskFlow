@@ -8,10 +8,13 @@ import java.time.LocalDateTime;
 
 @Component
 public class DatabaseJobLock {
+    private static final LocalDateTime RELEASED = LocalDateTime.of(1970, 1, 1, 0, 0);
     private final JdbcTemplate jdbc;
     private final String owner = ManagementFactory.getRuntimeMXBean().getName();
     public DatabaseJobLock(JdbcTemplate jdbc) { this.jdbc = jdbc; }
     public boolean acquire(String name, Duration lease) {
+        jdbc.update("INSERT IGNORE INTO scheduled_job_locks (name, locked_until) VALUES (?, ?)",
+                name, RELEASED);
         LocalDateTime now = LocalDateTime.now();
         return jdbc.update("""
                 UPDATE scheduled_job_locks

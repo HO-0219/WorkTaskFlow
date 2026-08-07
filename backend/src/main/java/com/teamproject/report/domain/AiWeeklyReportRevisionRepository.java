@@ -36,4 +36,6 @@ public interface AiWeeklyReportRevisionRepository extends JpaRepository<AiWeekly
             LocalDate periodToExclusive,
             String language
     );
+
+    Optional<AiWeeklyReportRevision> findTopByGroupIdOrderByPeriodToExclusiveDescRevisionDesc(Long groupId);
 }

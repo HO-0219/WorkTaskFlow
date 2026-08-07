@@ -23,7 +23,7 @@ class MySqlFlywayMigrationTest {
                     .withPassword("worktaskflow");
 
     @Test
-    void migratesFreshMySqlSchemaFromV1ThroughV35() throws Exception {
+    void migratesFreshMySqlSchemaFromV1ThroughV38() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
@@ -31,7 +31,7 @@ class MySqlFlywayMigrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("35");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("38");
         assertThat(countSchemaObjects(
                 "information_schema.tables",
                 "table_name",
@@ -40,8 +40,9 @@ class MySqlFlywayMigrationTest {
                         "ai_weekly_report_revision",
                         "task_activity_events",
                         "weekly_objectives",
-                        "task_weekly_objective_links")))
-                .isEqualTo(5);
+                        "task_weekly_objective_links",
+                        "ai_assistant_actions")))
+                .isEqualTo(6);
         assertThat(countColumns(
                 "reports",
                 List.of(
@@ -59,6 +60,19 @@ class MySqlFlywayMigrationTest {
                         "blocker_next_action_type",
                         "blocker_review_date")))
                 .isEqualTo(3);
+        assertThat(countColumns(
+                "payment_attempts",
+                List.of(
+                        "subscription_id",
+                        "business_key",
+                        "billing_period_start",
+                        "billing_kind",
+                        "provider_payment_key")))
+                .isEqualTo(5);
+        assertThat(countColumns(
+                "group_subscriptions",
+                List.of("billing_claim_key", "billing_claimed_at")))
+                .isEqualTo(2);
     }
 
     private long countColumns(String table, List<String> columns) throws Exception {

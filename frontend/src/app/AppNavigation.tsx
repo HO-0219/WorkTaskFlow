@@ -12,6 +12,7 @@ const items = [
   { to: '/groups', label: '그룹', icon: '♧' },
   { to: '/calendar', label: '캘린더', icon: '□' },
   { to: '/notifications', label: '알림', icon: '♢' },
+  { to: '/assistant', label: '비서', icon: '✦' },
   { to: '/profile', label: '프로필', icon: '○' },
 ];
 
@@ -42,7 +43,7 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
   useEffect(() => { if (unreadCount !== undefined) setLiveUnreadCount(unreadCount); }, [unreadCount]);
   const pathGroupId = pathname.match(/^\/groups\/(\d+)/)?.[1];
   const selectedGroupId = pathGroupId ?? new URLSearchParams(search).get('groupId') ?? '';
-  const labels = language === 'ko' ? ['홈', '그룹', '캘린더', '알림', '프로필'] : ['Home', 'Groups', 'Calendar', 'Alerts', 'Profile'];
+  const labels = language === 'ko' ? ['홈', '그룹', '캘린더', '알림', '비서', '프로필'] : ['Home', 'Groups', 'Calendar', 'Alerts', 'Assistant', 'Profile'];
   const teamGroups = groups.filter((group) => group.type === 'TEAM');
   const demo = sessionMode.isDemo();
   async function exitDemo() {

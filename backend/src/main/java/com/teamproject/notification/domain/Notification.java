@@ -68,6 +68,7 @@ public class Notification {
     public Task getTask() { return task; }
     public TaskComment getComment() { return comment; }
     public Type getType() { return type; }
+    public String getEventKey() { return eventKey; }
     public String getTitle() { return title; }
     public String getMessage() { return message; }
     public LocalDateTime getReadAt() { return readAt; }
