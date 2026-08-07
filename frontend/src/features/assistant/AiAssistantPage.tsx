@@ -89,6 +89,22 @@ export function AiAssistantPage() {
     }
   }
 
+  // 자료는 올린다고 바로 검색되지 않는다. 색인은 사용자가 이 버튼으로 직접 돌린다.
+  async function reindex() {
+    if (!groupId || pending) return;
+    setPending(true);
+    try {
+      const result = await assistantApi.reindex(groupId);
+      setItems((old) => [...old, assistantMessage(t(
+        `자료 색인을 마쳤습니다. 새로 ${result.indexed}건, 그대로 ${result.skipped}건, 삭제 ${result.removed}건, 형식 미지원 ${result.unsupported}건.`,
+        `Indexing finished. ${result.indexed} added, ${result.skipped} unchanged, ${result.removed} removed, ${result.unsupported} unsupported.`))]);
+    } catch (caught) {
+      setItems((old) => [...old, assistantMessage(errorMessage(caught))]);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function copyInvite(url: string) {
     await navigator.clipboard.writeText(url);
     setItems((old) => [...old, assistantMessage(t('초대 링크를 복사했습니다.', 'Invite link copied.'))]);
@@ -104,6 +120,8 @@ export function AiAssistantPage() {
         setItems((old) => [...old, assistantMessage(t('작업 그룹을 변경했습니다.', 'Workspace changed.'))]);
       }}><option value="" disabled>{t('그룹 선택', 'Choose a group')}</option>{groups.map((group) =>
         <option value={group.id} key={group.id}>{group.name}</option>)}</select></label>
+      <button type="button" className="secondary" disabled={!groupId || pending} onClick={reindex}>
+        {t('자료 색인', 'Index documents')}</button>
     </header>
 
     <section className="assistant-chat" aria-label={t('AI 비서 대화', 'AI assistant chat')}>

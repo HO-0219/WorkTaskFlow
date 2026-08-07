@@ -18,6 +18,8 @@ public final class AiAssistantDtos {
     public record ActionResponse(
             Long actionId, String status, String message, String targetUrl,
             String inviteUrl, Long selectedGroupId) {}
+    public record IndexResponse(
+            int indexed, int skipped, int removed, int unsupported, java.util.List<String> failures) {}
     public record MessageResponse(
             Long id, String role, String content, Long actionId, String actionType,
             String actionSummary, LocalDateTime actionExpiresAt, String actionStatus,
