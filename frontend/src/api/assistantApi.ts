@@ -14,13 +14,27 @@ export type AssistantActionResponse = {
   message: string;
   targetUrl?: string;
   inviteUrl?: string;
+  selectedGroupId?: number;
+};
+export type AssistantMessageResponse = {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+  actionId?: number;
+  actionType?: string;
+  actionSummary?: string;
+  actionExpiresAt?: string;
+  actionStatus?: 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+  createdAt: string;
 };
 
 export const assistantApi = {
-  chat: (groupId: number, message: string, history: AssistantTurn[]) =>
+  chat: (groupId: number, message: string) =>
     request<AssistantChatResponse>('/assistant/messages', {
-      method: 'POST', body: JSON.stringify({ groupId, message, history: history.slice(-10) }),
+      method: 'POST', body: JSON.stringify({ groupId, message }),
     }, true),
+  messages: (groupId: number) => request<AssistantMessageResponse[]>(
+    `/assistant/messages?groupId=${groupId}`, {}, true),
   confirm: (actionId: number) => request<AssistantActionResponse>(
     `/assistant/actions/${actionId}/confirm`, { method: 'POST' }, true),
   cancel: (actionId: number) => request<AssistantActionResponse>(

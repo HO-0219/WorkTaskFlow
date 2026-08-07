@@ -18,32 +18,47 @@ export function AiAssistantPage() {
   const [params, setParams] = useSearchParams();
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [message, setMessage] = useState('');
-  const [items, setItems] = useState<ChatItem[]>([{
-    id: 1, role: 'assistant', content: t(
-      '무엇을 도와드릴까요? 업무 생성, 업무 승인, 체크리스트 작성, 그룹 초대 링크 생성을 맡길 수 있어요.',
-      'How can I help? I can create or approve tasks, add checklists, and create group invite links.'),
-  }]);
+  const [items, setItems] = useState<ChatItem[]>([]);
   const [pending, setPending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const groupId = Number(params.get('groupId') ?? 0);
 
   useEffect(() => {
     groupApi.list().then((values) => {
       setGroups(values);
       if (!groupId && values.length > 0) setParams({ groupId: String(values[0].id) }, { replace: true });
-    }).catch((caught) => setItems((old) => [...old, assistantMessage(errorMessage(caught))]));
+    }).catch((caught) => setItems([assistantMessage(errorMessage(caught))]));
   }, []);
+
+  useEffect(() => {
+    if (!groupId) return;
+    setLoadingHistory(true);
+    assistantApi.messages(groupId).then((values) => {
+      setItems(values.length > 0 ? values.map((value) => ({
+        id: value.id, role: value.role, content: value.content,
+        actionId: value.actionId, actionSummary: value.actionSummary,
+        actionResult: value.actionId && value.actionStatus && value.actionStatus !== 'PENDING'
+          ? {
+            actionId: value.actionId, status: value.actionStatus,
+            message: value.actionStatus === 'COMPLETED'
+              ? t('이미 실행한 작업입니다.', 'This action was already completed.')
+              : t('실행할 수 없는 작업입니다.', 'This action can no longer be run.'),
+          } : undefined,
+      })) : [welcomeMessage(t)]);
+    }).catch((caught) => setItems([assistantMessage(errorMessage(caught))]))
+      .finally(() => setLoadingHistory(false));
+  }, [groupId]);
 
   async function send(event: FormEvent) {
     event.preventDefault();
     const content = message.trim();
     if (!content || !groupId || pending) return;
     const userItem: ChatItem = { id: Date.now(), role: 'user', content };
-    const history = items.map(({ role, content: value }) => ({ role, content: value }));
     setItems((old) => [...old, userItem]);
     setMessage('');
     setPending(true);
     try {
-      const response = await assistantApi.chat(groupId, content, history);
+      const response = await assistantApi.chat(groupId, content);
       setItems((old) => [...old, {
         id: Date.now() + 1, role: 'assistant', content: response.message,
         actionId: response.pendingActionId, actionSummary: response.actionSummary,
@@ -64,6 +79,9 @@ export function AiAssistantPage() {
         : await assistantApi.cancel(item.actionId);
       setItems((old) => old.map((value) => value.id === item.id
         ? { ...value, actionResult: result } : value));
+      if (result.selectedGroupId) {
+        setParams({ groupId: String(result.selectedGroupId) });
+      }
     } catch (caught) {
       setItems((old) => [...old, assistantMessage(errorMessage(caught))]);
     } finally {
@@ -101,9 +119,17 @@ export function AiAssistantPage() {
               {item.actionResult.inviteUrl && <button type="button" onClick={() => copyInvite(item.actionResult!.inviteUrl!)}>{t('초대 링크 복사', 'Copy invite link')}</button>}</div>}
           </div>}
         </article>)}</div>
-      {pending && <p className="assistant-thinking" role="status">{t('비서가 확인하고 있어요…', 'The assistant is working…')}</p>}
+      {(pending || loadingHistory) && <p className="assistant-thinking" role="status">{loadingHistory
+        ? t('이전 대화를 불러오고 있어요…', 'Loading previous messages…')
+        : t('비서가 확인하고 있어요…', 'The assistant is working…')}</p>}
       <form className="assistant-composer" onSubmit={send}><textarea value={message} maxLength={2000}
         onChange={(event) => setMessage(event.target.value)} disabled={!groupId || pending}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
         placeholder={t("예: '배포 점검 업무를 만들고 체크리스트에 테스트, 모니터링을 넣어줘'",
           "Example: 'Create a release check task with testing and monitoring checklist items'")} />
         <button type="submit" disabled={!message.trim() || !groupId || pending}>{t('보내기', 'Send')}</button></form>
@@ -113,4 +139,10 @@ export function AiAssistantPage() {
 
 function assistantMessage(content: string): ChatItem {
   return { id: Date.now() + Math.random(), role: 'assistant', content };
+}
+
+function welcomeMessage(t: (ko: string, en: string) => string): ChatItem {
+  return assistantMessage(t(
+    '무엇을 도와드릴까요? 업무·댓글·멘션·알림 처리와 작업 그룹 선택을 맡길 수 있어요.',
+    'How can I help? I can handle tasks, comments, mentions, notifications, and workspace selection.'));
 }

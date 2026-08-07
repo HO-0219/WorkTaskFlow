@@ -115,6 +115,17 @@ public class NotificationService {
     }
 
     @Transactional
+    public void assistantMessage(GroupMember actor, Collection<GroupMember> rawRecipients,
+            String eventKey, String title, String message) {
+        var recipients = new LinkedHashMap<Long, User>();
+        rawRecipients.forEach(member -> recipients.put(member.getUser().getId(), member.getUser()));
+        recipients.remove(actor.getUser().getId());
+        recipients.values().forEach(recipient -> insertAndPublish(new Notification(
+                recipient, actor.getUser(), actor.getGroup(), null, null,
+                Notification.Type.ASSISTANT_MESSAGE, eventKey, title, message)));
+    }
+
+    @Transactional
     public void newDeviceLogin(User user, String deviceName, String eventKey) {
         createSecurity(user, Notification.Type.SECURITY_NEW_DEVICE, eventKey,
                 "새 기기 로그인", deviceName + "에서 새 로그인이 확인되었습니다.");

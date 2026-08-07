@@ -23,7 +23,7 @@ class MySqlFlywayMigrationTest {
                     .withPassword("worktaskflow");
 
     @Test
-    void migratesFreshMySqlSchemaFromV1ThroughV38() throws Exception {
+    void migratesFreshMySqlSchemaFromV1ThroughV39() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
@@ -31,7 +31,7 @@ class MySqlFlywayMigrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("38");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("39");
         assertThat(countSchemaObjects(
                 "information_schema.tables",
                 "table_name",
@@ -41,8 +41,9 @@ class MySqlFlywayMigrationTest {
                         "task_activity_events",
                         "weekly_objectives",
                         "task_weekly_objective_links",
-                        "ai_assistant_actions")))
-                .isEqualTo(6);
+                        "ai_assistant_actions",
+                        "ai_assistant_messages")))
+                .isEqualTo(7);
         assertThat(countColumns(
                 "reports",
                 List.of(

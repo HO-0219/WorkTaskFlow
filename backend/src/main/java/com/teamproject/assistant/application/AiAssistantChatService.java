@@ -9,6 +9,7 @@ import com.teamproject.assistant.application.port.AiAssistantGateway.TextDecisio
 import com.teamproject.assistant.application.port.AiAssistantGateway.ToolDecision;
 import com.teamproject.assistant.domain.AiAssistantAction;
 import com.teamproject.assistant.domain.AiAssistantActionRepository;
+import com.teamproject.assistant.domain.AiAssistantMessage;
 import com.teamproject.common.exception.ApplicationException;
 import com.teamproject.user.domain.UserRepository;
 import java.time.LocalDateTime;
@@ -19,50 +20,51 @@ import org.springframework.stereotype.Service;
 @Service
 public class AiAssistantChatService {
     private static final Set<String> TOOLS = Set.of(
-            "create_task", "create_group_invite_link", "approve_task", "add_task_checklist");
+            "create_task", "create_group_invite_link", "approve_task", "add_task_checklist",
+            "select_workspace", "create_task_comment", "send_group_notification");
     private final AiAssistantContextService contexts;
     private final AiAssistantGateway gateway;
     private final AiAssistantActionRepository actions;
     private final UserRepository users;
     private final ObjectMapper objectMapper;
+    private final AiAssistantMessageStore messages;
 
     public AiAssistantChatService(AiAssistantContextService contexts, AiAssistantGateway gateway,
-            AiAssistantActionRepository actions, UserRepository users, ObjectMapper objectMapper) {
+            AiAssistantActionRepository actions, UserRepository users, ObjectMapper objectMapper,
+            AiAssistantMessageStore messages) {
         this.contexts = contexts;
         this.gateway = gateway;
         this.actions = actions;
         this.users = users;
         this.objectMapper = objectMapper;
+        this.messages = messages;
     }
 
     public ChatResponse chat(Long userId, ChatRequest request) {
         var context = contexts.load(userId, request.groupId());
-        var decision = gateway.decide(input(context.json(), request));
+        var history = messages.modelContext(userId, request.groupId());
+        messages.append(userId, context.group(), AiAssistantMessage.Role.USER, request.message(), null);
+        var decision = gateway.decide(context.json(), history, request.message());
         if (decision instanceof TextDecision text) {
-            return new ChatResponse(text.text(), null, null, null, null);
+            String response = text.text() == null || text.text().isBlank()
+                    ? "요청을 이해하지 못했습니다. 조금 더 구체적으로 말씀해 주세요."
+                    : text.text().trim();
+            messages.append(userId, context.group(), AiAssistantMessage.Role.ASSISTANT, response, null);
+            return new ChatResponse(response, null, null, null, null);
         }
         ToolDecision tool = (ToolDecision) decision;
         if (!TOOLS.contains(tool.name())) invalidTool();
         JsonNode arguments = parse(tool.argumentsJson());
-        validateScope(tool.name(), arguments, context.json());
+        validateScope(tool.name(), arguments, context);
         String summary = summary(tool.name(), arguments);
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
         var user = users.findById(userId).orElseThrow();
         var action = actions.save(new AiAssistantAction(user, context.group(), tool.name(),
                 arguments.toString(), summary, expiresAt));
-        return new ChatResponse("아래 작업을 실행할까요? 내용을 확인해 주세요.",
+        String response = "아래 작업을 실행할까요? 내용을 확인해 주세요.";
+        messages.append(userId, context.group(), AiAssistantMessage.Role.ASSISTANT, response, action);
+        return new ChatResponse(response,
                 action.getId(), tool.name(), summary, expiresAt);
-    }
-
-    private String input(String context, ChatRequest request) {
-        StringBuilder value = new StringBuilder("CURRENT_CONTEXT\n").append(context).append("\n\n");
-        if (request.history() != null) {
-            request.history().forEach(turn -> {
-                String role = turn.role().equalsIgnoreCase("assistant") ? "ASSISTANT" : "USER";
-                value.append(role).append(": ").append(turn.content()).append('\n');
-            });
-        }
-        return value.append("USER: ").append(request.message()).toString();
     }
 
     private JsonNode parse(String value) {
@@ -76,11 +78,31 @@ public class AiAssistantChatService {
         }
     }
 
-    private void validateScope(String tool, JsonNode arguments, String contextJson) {
-        if ((tool.equals("approve_task") || tool.equals("add_task_checklist"))) {
+    private void validateScope(String tool, JsonNode arguments,
+            AiAssistantContextService.Context context) {
+        if (tool.equals("approve_task") || tool.equals("add_task_checklist")
+                || tool.equals("create_task_comment")) {
             long taskId = arguments.path("taskId").asLong(0);
-            if (taskId <= 0 || !contextJson.contains("\"id\":" + taskId + ",")) invalidTool();
+            if (taskId <= 0 || !context.recentTaskIds().contains(taskId)) invalidTool();
         }
+        if (tool.equals("select_workspace")) {
+            long groupId = arguments.path("groupId").asLong(0);
+            if (groupId <= 0 || !context.availableGroupIds().contains(groupId)) invalidTool();
+        }
+        if (tool.equals("create_task_comment")) {
+            validateMemberIds(arguments.path("mentionedMemberIds"), context);
+        }
+        if (tool.equals("send_group_notification")) {
+            validateMemberIds(arguments.path("recipientMemberIds"), context);
+        }
+    }
+
+    private void validateMemberIds(JsonNode node, AiAssistantContextService.Context context) {
+        if (node.isNull() || node.isMissingNode()) return;
+        if (!node.isArray() || node.isEmpty() || node.size() > 20) invalidTool();
+        node.forEach(value -> {
+            if (!value.canConvertToLong() || !context.memberIds().contains(value.asLong())) invalidTool();
+        });
     }
 
     private String summary(String tool, JsonNode args) {
@@ -90,6 +112,10 @@ public class AiAssistantChatService {
             case "approve_task" -> "업무 #" + args.path("taskId").asLong() + " 승인";
             case "add_task_checklist" -> "업무 #" + args.path("taskId").asLong()
                     + "에 체크리스트 " + args.path("items").size() + "개 추가";
+            case "select_workspace" -> "작업공간 #" + args.path("groupId").asLong() + " 선택";
+            case "create_task_comment" -> "업무 #" + args.path("taskId").asLong() + "에 댓글 작성";
+            case "send_group_notification" -> "그룹 멤버 "
+                    + args.path("recipientMemberIds").size() + "명에게 알림 전송";
             default -> invalidSummary();
         };
     }
