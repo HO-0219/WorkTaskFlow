@@ -95,7 +95,7 @@ public class SubscriptionBillingCoordinator {
 
     private TossPaymentsClient.ApiResult callProvider(PreparedCharge charge) {
         return toss.charge(cipher.decrypt(charge.encryptedBillingKey()), charge.customerKey(),
-                charge.amount(), charge.orderId(), "퇴사 팀 구독", charge.idempotencyKey());
+                charge.amount(), charge.orderId(), "퇴근 팀 구독", charge.idempotencyKey());
     }
 
     private void fail(PreparedCharge charge, TossPaymentsClient.ApiResult result, LocalDateTime now) {
