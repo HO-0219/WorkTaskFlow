@@ -78,29 +78,48 @@ public class AiDocumentIndexService {
                 unsupported++;
                 continue;
             }
-            List<String> pieces;
-            try {
-                byte[] content = storage.get(candidate.storageKey()).content();
-                pieces = chunker.split(extractor.extract(content, candidate.filename()));
-            } catch (RuntimeException exception) {
-                // 자료 하나가 실패해도 나머지는 계속 색인한다. 본문은 로그에 남기지 않는다.
-                log.warn("자료 {} 본문 추출 실패: {}", candidate.resourceId(),
-                        exception.getClass().getSimpleName());
-                failures.add(candidate.title());
-                continue;
-            }
-            if (pieces.isEmpty()) {
-                unsupported++;
-                continue;
-            }
-            try {
-                store.save(groupId, candidate, pieces, embeddings.embed(pieces));
-                added++;
-            } catch (RuntimeException exception) {
-                log.warn("자료 {} 색인 실패: {}", candidate.resourceId(), exception.getClass().getSimpleName());
-                failures.add(candidate.title());
+            switch (tryIndex(groupId, candidate)) {
+                case ADDED -> added++;
+                case UNSUPPORTED -> unsupported++;
+                case FAILED -> failures.add(candidate.title());
             }
         }
         return new IndexResponse(added, skipped, removed, unsupported, failures);
     }
+
+    /**
+     * 자료 하나를 업로드 직후 색인한다({@link AiDocumentAutoIndexListener}).
+     * 사용자가 누르는 재색인 버튼과 달리 업무 결과를 UI 에 보고하지 않는 조용한 경로라, 이미 색인된
+     * 자료거나 지원하지 않는 형식이면 그냥 건너뛴다.
+     */
+    public void indexResource(Long groupId, Long resourceId) {
+        if (store.isIndexed(resourceId)) return;
+        Candidate candidate = store.candidate(groupId, resourceId).orElse(null);
+        if (candidate == null || candidate.storageKey() == null || !extractor.supports(candidate.filename())) {
+            return;
+        }
+        tryIndex(groupId, candidate);
+    }
+
+    private Outcome tryIndex(Long groupId, Candidate candidate) {
+        List<String> pieces;
+        try {
+            byte[] content = storage.get(candidate.storageKey()).content();
+            pieces = chunker.split(extractor.extract(content, candidate.filename()));
+        } catch (RuntimeException exception) {
+            // 자료 하나가 실패해도 나머지는 계속 색인한다. 본문은 로그에 남기지 않는다.
+            log.warn("자료 {} 본문 추출 실패: {}", candidate.resourceId(), exception.getClass().getSimpleName());
+            return Outcome.FAILED;
+        }
+        if (pieces.isEmpty()) return Outcome.UNSUPPORTED;
+        try {
+            store.save(groupId, candidate, pieces, embeddings.embed(pieces));
+            return Outcome.ADDED;
+        } catch (RuntimeException exception) {
+            log.warn("자료 {} 색인 실패: {}", candidate.resourceId(), exception.getClass().getSimpleName());
+            return Outcome.FAILED;
+        }
+    }
+
+    private enum Outcome { ADDED, UNSUPPORTED, FAILED }
 }

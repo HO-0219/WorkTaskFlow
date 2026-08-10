@@ -12,5 +12,7 @@ public interface AiDocumentChunkRepository extends JpaRepository<AiDocumentChunk
     @Query("select distinct chunk.resource.id from AiDocumentChunk chunk where chunk.group.id = :groupId")
     List<Long> findIndexedResourceIds(@Param("groupId") Long groupId);
 
+    boolean existsByResourceId(Long resourceId);
+
     void deleteByResourceId(Long resourceId);
 }

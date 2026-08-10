@@ -6,6 +6,7 @@ import com.teamproject.resource.domain.GroupResource;
 import com.teamproject.resource.domain.GroupResourceRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,20 @@ public class AiDocumentChunkStore {
     @Transactional(readOnly = true)
     public Set<Long> indexedResourceIds(Long groupId) {
         return Set.copyOf(chunks.findIndexedResourceIds(groupId));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isIndexed(Long resourceId) {
+        return chunks.existsByResourceId(resourceId);
+    }
+
+    /** 업로드 직후 자동색인 경로가 쓴다. group.task 가 null인 자료만 검색 대상이라 그것만 돌려준다. */
+    @Transactional(readOnly = true)
+    public Optional<Candidate> candidate(Long groupId, Long resourceId) {
+        return resources.findByIdAndDeletedAtIsNull(resourceId)
+                .filter(resource -> resource.getGroup().getId().equals(groupId) && resource.getTask() == null)
+                .map(resource -> new Candidate(resource.getId(), resource.getTitle(),
+                        resource.getOriginalFilename(), resource.getStorageKey()));
     }
 
     @Transactional

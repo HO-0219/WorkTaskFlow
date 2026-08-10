@@ -88,6 +88,32 @@ class AiDocumentRagTest {
     }
 
     @Test
+    void indexesASingleResourceWithoutWaitingForReindex() {
+        Fixture fixture = fixture();
+        Long resourceId = upload(fixture, "배포 절차서", "배포.txt", "금요일에는 배포하지 않는다.");
+
+        indexService.indexResource(fixture.groupId(), resourceId);
+
+        assertThat(searchService.search(fixture.groupId(), "금요일 배포 규칙", 5)).isNotEmpty();
+        // 이미 색인됐으니 재색인 버튼을 눌러도 다시 세지 않는다.
+        var result = indexService.reindex(fixture.userId(), fixture.groupId());
+        assertThat(result.skipped()).isEqualTo(1);
+        assertThat(result.indexed()).isZero();
+    }
+
+    @Test
+    void indexResourceSkipsUnsupportedFormatsSilently() {
+        Fixture fixture = fixture();
+        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+        Long resourceId = upload(fixture, "설계 이미지", "설계.png", png);
+
+        indexService.indexResource(fixture.groupId(), resourceId);
+
+        var result = indexService.reindex(fixture.userId(), fixture.groupId());
+        assertThat(result.unsupported()).isEqualTo(1);
+    }
+
+    @Test
     void ranksTheRelevantPassageFirst() {
         Fixture fixture = fixture();
         upload(fixture, "배포 절차서", "배포.txt", "금요일에는 배포하지 않는다.");
