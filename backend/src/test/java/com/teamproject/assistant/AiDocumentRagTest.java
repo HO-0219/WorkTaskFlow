@@ -65,13 +65,25 @@ class AiDocumentRagTest {
     @Test
     void countsUnreadableFormatsAsUnsupportedInsteadOfFailing() {
         Fixture fixture = fixture();
-        upload(fixture, "설계 문서", "설계.pdf", "%PDF-1.4 본문");
+        upload(fixture, "설계 문서", "설계.pptx", "PK 본문");
 
         var result = indexService.reindex(fixture.userId(), fixture.groupId());
 
         assertThat(result.unsupported()).isEqualTo(1);
         assertThat(result.indexed()).isZero();
         assertThat(result.failures()).isEmpty();
+    }
+
+    @Test
+    void countsAMalformedPdfAsAFailureNotUnsupported() {
+        Fixture fixture = fixture();
+        upload(fixture, "설계 문서", "설계.pdf", "%PDF-1.4 본문");
+
+        var result = indexService.reindex(fixture.userId(), fixture.groupId());
+
+        assertThat(result.failures()).containsExactly("설계 문서");
+        assertThat(result.indexed()).isZero();
+        assertThat(result.unsupported()).isZero();
     }
 
     @Test

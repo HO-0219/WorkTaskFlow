@@ -1,6 +1,7 @@
 package com.teamproject.assistant.application;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.ByteBuffer;
@@ -12,17 +13,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.stereotype.Component;
 
 /**
  * 자료 파일에서 색인할 본문을 뽑는다.
  *
- * <p>1차 범위는 txt 와 csv 다. 나머지 허용 확장자(pdf·docx·xlsx·pptx)는 새 파싱 의존성이
- * 필요해서 색인 결과에 unsupported 로만 집계한다.
+ * <p>지원 범위는 txt·csv·pdf·docx 다. pdf 는 기존에 주간 리포트 PDF 생성에 쓰던 PDFBox를,
+ * docx 는 새로 추가한 POI 를 쓴다. xlsx·pptx 는 아직 파서가 없어 unsupported 로만 집계한다.
  */
 @Component
 public class DocumentTextExtractor {
-    private static final Set<String> SUPPORTED = Set.of("txt", "csv");
+    private static final Set<String> SUPPORTED = Set.of("txt", "csv", "pdf", "docx");
     private static final char BOM = '﻿';
 
     public boolean supports(String filename) {
@@ -33,6 +39,8 @@ public class DocumentTextExtractor {
         return switch (extension(filename)) {
             case "txt" -> decode(content);
             case "csv" -> fromCsv(content);
+            case "pdf" -> fromPdf(content);
+            case "docx" -> fromDocx(content);
             default -> "";
         };
     }
@@ -89,6 +97,23 @@ public class DocumentTextExtractor {
             if (!pairs.isEmpty()) lines.add(String.join(", ", pairs));
         }
         return String.join("\n", lines);
+    }
+
+    private String fromPdf(byte[] content) {
+        try (PDDocument document = Loader.loadPDF(content)) {
+            return new PDFTextStripper().getText(document).strip();
+        } catch (IOException exception) {
+            throw new IllegalStateException("pdf 본문을 읽지 못했습니다.", exception);
+        }
+    }
+
+    private String fromDocx(byte[] content) {
+        try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(content));
+                XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
+            return extractor.getText().strip();
+        } catch (IOException exception) {
+            throw new IllegalStateException("docx 본문을 읽지 못했습니다.", exception);
+        }
     }
 
     /** 큰따옴표로 감싼 값과 그 안의 쉼표만 다루는 최소 CSV 분해다. */
