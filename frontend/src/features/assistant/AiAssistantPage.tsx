@@ -95,9 +95,13 @@ export function AiAssistantPage() {
     setPending(true);
     try {
       const result = await assistantApi.reindex(groupId);
+      const failureNote = result.failures.length > 0
+        ? t(` 실패 ${result.failures.length}건: ${result.failures.join(', ')}.`,
+          ` Failed ${result.failures.length}: ${result.failures.join(', ')}.`)
+        : '';
       setItems((old) => [...old, assistantMessage(t(
-        `자료 색인을 마쳤습니다. 새로 ${result.indexed}건, 그대로 ${result.skipped}건, 삭제 ${result.removed}건, 형식 미지원 ${result.unsupported}건.`,
-        `Indexing finished. ${result.indexed} added, ${result.skipped} unchanged, ${result.removed} removed, ${result.unsupported} unsupported.`))]);
+        `자료 색인을 마쳤습니다. 새로 ${result.indexed}건, 그대로 ${result.skipped}건, 삭제 ${result.removed}건, 형식 미지원 ${result.unsupported}건.${failureNote}`,
+        `Indexing finished. ${result.indexed} added, ${result.skipped} unchanged, ${result.removed} removed, ${result.unsupported} unsupported.${failureNote}`))]);
     } catch (caught) {
       setItems((old) => [...old, assistantMessage(errorMessage(caught))]);
     } finally {

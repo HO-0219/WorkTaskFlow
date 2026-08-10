@@ -5,6 +5,9 @@ import com.teamproject.assistant.domain.AiDocumentChunk;
 import com.teamproject.assistant.domain.AiDocumentChunkRepository;
 import java.util.Comparator;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 /**
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class AiDocumentSearchService {
+    private static final Logger log = LoggerFactory.getLogger(AiDocumentSearchService.class);
     /** 그룹당 청크가 수십 개뿐이라 5로는 근거 문서가 밀려난다. 8이면 회수가 올라가고 비용은 그대로다. */
     public static final int DEFAULT_LIMIT = 8;
     /** 청크를 전부 읽어 메모리에서 재기 때문에 그룹당 상한을 둔다(24KB 코퍼스 기준 수십 개). */
@@ -34,7 +38,15 @@ public class AiDocumentSearchService {
         List<Scored> scored = scored(groupId);
         if (scored.isEmpty()) return List.of();
         float[] vector = embeddings.embed(List.of(query)).get(0);
-        return scored.stream()
+        List<Scored> comparable = scored.stream()
+                .filter(candidate -> candidate.vector().length == vector.length)
+                .toList();
+        if (comparable.size() < scored.size()) {
+            log.warn("group {}: {} chunk(s) skipped, embedding dimension mismatch"
+                    + " (query {} vs stored) — reindex required after an embedding model change",
+                    groupId, scored.size() - comparable.size(), vector.length);
+        }
+        return comparable.stream()
                 .map(candidate -> new Passage(candidate.title(), candidate.filename(),
                         round(cosine(vector, candidate.vector())), candidate.content()))
                 .sorted(Comparator.comparingDouble(Passage::score).reversed())
@@ -44,18 +56,19 @@ public class AiDocumentSearchService {
 
     /**
      * 임베딩 호출 전에 후보를 다 읽어 둔다. 외부 호출이 트랜잭션을 잡고 있지 않게 하려는 것이다.
-     * 그래서 이 메서드에도 search() 에도 @Transactional 을 걸지 않는다.
+     * 그래서 이 메서드에도 search() 에도 @Transactional 을 걸지 않는다. 상한은 쿼리 자체에
+     * Pageable 로 걸어서, DB 에서 그룹 전체를 다 읽어온 뒤에 자르는 일이 없게 한다.
      */
     private List<Scored> scored(Long groupId) {
-        List<AiDocumentChunk> stored = chunks.findAllByGroupIdOrderByIdAsc(groupId);
-        return stored.stream().limit(MAX_SCANNED_CHUNKS)
+        List<AiDocumentChunk> stored = chunks.findByGroupIdOrderByIdAsc(groupId,
+                PageRequest.of(0, MAX_SCANNED_CHUNKS));
+        return stored.stream()
                 .map(chunk -> new Scored(chunk.getTitle(), chunk.getFilename(), chunk.getContent(),
                         chunk.vector()))
                 .toList();
     }
 
     private double cosine(float[] left, float[] right) {
-        if (left.length != right.length) return 0;
         double dot = 0;
         double leftNorm = 0;
         double rightNorm = 0;

@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class DocumentTextExtractor {
     private static final Set<String> SUPPORTED = Set.of("txt", "csv");
+    private static final char BOM = '﻿';
 
     public boolean supports(String filename) {
         return SUPPORTED.contains(extension(filename));
@@ -46,16 +47,21 @@ public class DocumentTextExtractor {
     private String decode(byte[] content) {
         for (Charset charset : List.of(StandardCharsets.UTF_8, Charset.forName("x-windows-949"))) {
             try {
-                return charset.newDecoder()
+                return stripBom(charset.newDecoder()
                         .onMalformedInput(CodingErrorAction.REPORT)
                         .onUnmappableCharacter(CodingErrorAction.REPORT)
                         .decode(ByteBuffer.wrap(content))
-                        .toString();
+                        .toString());
             } catch (CharacterCodingException ignored) {
                 // 다음 인코딩 후보로 넘어간다.
             }
         }
-        return new String(content, StandardCharsets.UTF_8);
+        return stripBom(new String(content, StandardCharsets.UTF_8));
+    }
+
+    /** 엑셀이 내보낸 UTF-8 파일은 앞에 BOM(U+FEFF)을 붙이는 것이 흔하다. 첫 필드를 오염시키므로 걷어낸다. */
+    private String stripBom(String value) {
+        return !value.isEmpty() && value.charAt(0) == BOM ? value.substring(1) : value;
     }
 
     /** 행을 "열이름: 값" 으로 편다. 헤더만 반복되는 청크가 검색을 망치지 않게 한다. */
@@ -75,8 +81,10 @@ public class DocumentTextExtractor {
         List<String> lines = new ArrayList<>();
         for (List<String> row : rows.subList(1, rows.size())) {
             List<String> pairs = new ArrayList<>();
-            for (int index = 0; index < row.size() && index < header.size(); index++) {
-                if (!row.get(index).isEmpty()) pairs.add(header.get(index) + ": " + row.get(index));
+            for (int index = 0; index < row.size(); index++) {
+                if (row.get(index).isEmpty()) continue;
+                String key = index < header.size() ? header.get(index) : "열" + (index + 1);
+                pairs.add(key + ": " + row.get(index));
             }
             if (!pairs.isEmpty()) lines.add(String.join(", ", pairs));
         }
