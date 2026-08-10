@@ -65,7 +65,8 @@ class AiDocumentRagTest {
     @Test
     void countsUnreadableFormatsAsUnsupportedInsteadOfFailing() {
         Fixture fixture = fixture();
-        upload(fixture, "설계 문서", "설계.pptx", "PK 본문");
+        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+        upload(fixture, "설계 이미지", "설계.png", png);
 
         var result = indexService.reindex(fixture.userId(), fixture.groupId());
 
@@ -134,9 +135,12 @@ class AiDocumentRagTest {
     }
 
     private Long upload(Fixture fixture, String title, String filename, String content) {
+        return upload(fixture, title, filename, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private Long upload(Fixture fixture, String title, String filename, byte[] content) {
         return resources.upload(fixture.userId(), fixture.groupId(), null, title,
-                new MockMultipartFile("file", filename, "text/plain",
-                        content.getBytes(StandardCharsets.UTF_8))).id();
+                new MockMultipartFile("file", filename, "text/plain", content)).id();
     }
 
     private Fixture fixture() {

@@ -11,6 +11,12 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xslf.usermodel.XSLFSlide;
+import org.apache.poi.xslf.usermodel.XSLFTextBox;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +65,22 @@ class AiDocumentTextTest {
         assertThat(extractor.extract(docx, "규정.docx")).contains("금요일 배포는 금지한다.");
     }
 
+    @Test
+    void readsXlsxRowsAsHeaderValuePairs() throws Exception {
+        byte[] xlsx = xlsxBytes(List.of(
+                List.of("월", "처리건수"),
+                List.of("2026-06", "120")));
+
+        assertThat(extractor.extract(xlsx, "통계.xlsx")).contains("월: 2026-06, 처리건수: 120");
+    }
+
+    @Test
+    void readsPptxSlideText() throws Exception {
+        byte[] pptx = pptxBytes("금요일 배포는 금지한다.");
+
+        assertThat(extractor.extract(pptx, "규정.pptx")).contains("금요일 배포는 금지한다.");
+    }
+
     private byte[] pdfBytes(String text) throws Exception {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage();
@@ -79,6 +101,31 @@ class AiDocumentTextTest {
         try (XWPFDocument document = new XWPFDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             document.createParagraph().createRun().setText(text);
             document.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] xlsxBytes(List<List<String>> rows) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("시트1");
+            for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+                Row row = sheet.createRow(rowIndex);
+                List<String> cells = rows.get(rowIndex);
+                for (int cellIndex = 0; cellIndex < cells.size(); cellIndex++) {
+                    row.createCell(cellIndex).setCellValue(cells.get(cellIndex));
+                }
+            }
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] pptxBytes(String text) throws Exception {
+        try (XMLSlideShow slideShow = new XMLSlideShow(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            XSLFSlide slide = slideShow.createSlide();
+            XSLFTextBox textBox = slide.createTextBox();
+            textBox.setText(text);
+            slideShow.write(out);
             return out.toByteArray();
         }
     }
@@ -108,8 +155,8 @@ class AiDocumentTextTest {
         assertThat(extractor.supports("통계.csv")).isTrue();
         assertThat(extractor.supports("설계.pdf")).isTrue();
         assertThat(extractor.supports("회의록.docx")).isTrue();
-        assertThat(extractor.supports("통계.xlsx")).isFalse();
-        assertThat(extractor.supports("발표.pptx")).isFalse();
+        assertThat(extractor.supports("통계.xlsx")).isTrue();
+        assertThat(extractor.supports("발표.pptx")).isTrue();
         assertThat(extractor.supports("사진.png")).isFalse();
         assertThat(extractor.supports(null)).isFalse();
     }
