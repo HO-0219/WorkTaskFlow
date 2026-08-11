@@ -144,6 +144,7 @@ class AiAssistantActionServiceTest {
         User user = users.save(new User("assistant_" + suffix,
                 "assistant_" + suffix + "@example.com", "hash", "AI 사용자", true));
         Group group = groups.save(Group.team("AI 테스트 그룹", null, "Asia/Seoul", user));
+        group.switchTestMembership(Group.MembershipPlan.PAID, LocalDateTime.now());
         members.save(leader ? GroupMember.leader(group, user) : GroupMember.member(group, user));
         return new Fixture(user, group);
     }

@@ -14,7 +14,7 @@ import java.util.Optional;
  * 문자열이 되어 모델이 계약 밖 값을 돌려줄 수 있고, 그러면 유료 호출이 끝난 뒤에 매핑이나
  * 검증에서 버려진다. enum이면 응답 단계에서 값이 강제된다.
  */
-@JsonClassDescription("Validated AI analysis for the Team Workflow Assistant v7-2 weekly report")
+@JsonClassDescription("Validated AI analysis for the AI Work Management Service v7-2 weekly report")
 public final class AiWeeklyReportAnalysisContract {
 
     public String schemaVersion;

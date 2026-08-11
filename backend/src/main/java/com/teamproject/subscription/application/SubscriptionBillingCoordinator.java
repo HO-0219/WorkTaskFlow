@@ -27,6 +27,8 @@ public class SubscriptionBillingCoordinator {
         this.cipher = cipher;
     }
 
+    public boolean testPaymentsEnabled() { return toss.usesOfficialTestKey(); }
+
     public void activate(Long userId, Long groupId, Long paymentMethodId, long amount,
             String termsVersion, String refundPolicyVersion, String ipAddress, String userAgent,
             LocalDateTime now) {

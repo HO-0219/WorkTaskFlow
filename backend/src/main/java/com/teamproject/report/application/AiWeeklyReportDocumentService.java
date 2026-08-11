@@ -713,8 +713,8 @@ public class AiWeeklyReportDocumentService {
                                 + missing.stream().map(this::escape)
                                         .collect(java.util.stream.Collectors.joining("<br>· ", "<br>· ", "")),
                 doc.ko ? "회의 종료 조건" : "Meeting exit criteria",
-                doc.ko ? "결정 항목의 상태, 담당자, 기한, 완료 조건이 Team Workflow Assistant에 기록됨"
-                        : "Status, owner, due date, and completion criteria recorded in Team Workflow Assistant",
+                doc.ko ? "결정 항목의 상태, 담당자, 기한, 완료 조건이 퇴근에 기록됨"
+                        : "Status, owner, due date, and completion criteria recorded in toegeun",
                 doc.ko ? "수치는 확정 업무 데이터입니다. AI는 해석과 권고만 제공하며 최종 결정은 팀장이 수행합니다. "
                         + "댓글 원문·첨부파일 내용·기록되지 않은 협의는 반영하지 않았습니다."
                         : "Figures come from confirmed task data. AI provides interpretation and advice only; "

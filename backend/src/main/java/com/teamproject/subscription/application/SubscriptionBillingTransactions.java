@@ -179,13 +179,17 @@ public class SubscriptionBillingTransactions {
     }
 
     private void ensureNoClaim(GroupSubscription subscription) {
-        if (subscription.getBillingClaimKey() != null) {
-            throw new ApplicationException("PAYMENT_RECONCILIATION_REQUIRED", HttpStatus.CONFLICT,
-                    "이 구독의 이전 결제 결과를 확인하고 있습니다.");
-        }
+        ensureNoBillingClaim(subscription);
         if (subscription.getSubscriber().getPaymentCustomerKey() == null) {
             throw new ApplicationException("PAYMENT_CUSTOMER_NOT_READY", HttpStatus.CONFLICT,
                     "결제 고객 정보를 먼저 생성해 주세요.");
+        }
+    }
+
+    private void ensureNoBillingClaim(GroupSubscription subscription) {
+        if (subscription.getBillingClaimKey() != null) {
+            throw new ApplicationException("PAYMENT_RECONCILIATION_REQUIRED", HttpStatus.CONFLICT,
+                    "이 구독의 이전 결제 결과를 확인하고 있습니다.");
         }
     }
 

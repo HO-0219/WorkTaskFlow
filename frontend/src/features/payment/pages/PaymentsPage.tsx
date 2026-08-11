@@ -4,18 +4,7 @@ import { accessToken, errorMessage } from '../../../api/client';
 import { PaymentAttempt, PaymentConfig, PaymentMethod, paymentApi } from '../../../api/paymentApi';
 import { AppNavigation } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
-
-declare global {
-  interface Window {
-    TossPayments?: (clientKey: string) => {
-      payment: (options: { customerKey: string }) => {
-        requestBillingAuth: (options: {
-          method: 'CARD'; successUrl: string; failUrl: string;
-        }) => Promise<void>;
-      };
-    };
-  }
-}
+import { loadTossSdk } from '../../../app/tossPayments';
 
 export function PaymentsPage() {
   const { t, language } = useLanguage();
@@ -108,21 +97,16 @@ export function PaymentsPage() {
     <section className="payment-panel"><div className="payment-heading"><div><h2>{t('등록된 결제수단', 'Payment methods')}</h2><small>{t('민감한 카드번호와 빌링키는 화면과 로그에 표시하지 않습니다.', 'Sensitive card numbers and billing keys are never shown or logged.')}</small></div><button className="primary" type="button" disabled={pending || !config?.configured} onClick={addMethod}>{t('결제수단 추가', 'Add payment method')}</button></div>
       {!loading && activeMethods.length === 0 ? <p className="empty-state">{t('등록된 결제수단이 없습니다.', 'No payment methods have been added.')}</p> : <div className="payment-method-list">{activeMethods.map((method) => <div className="payment-method-row" key={method.id}><div><strong>{method.maskedNumber || t('등록된 카드', 'Saved card')}</strong><small>{method.issuerCode || 'Toss Payments'} · {formatDate(method.createdAt, language)}</small></div>{config?.testMode && <button type="button" disabled={pending} onClick={() => testCharge(method.id)}>{t('100원 테스트', 'Test KRW 100')}</button>}</div>)}</div>}
     </section>
-    <section className="payment-panel"><h2>{t('API 호출 로그', 'API call log')}</h2>{!loading && attempts.length === 0 ? <p className="empty-state">{t('아직 결제 API 호출 기록이 없습니다.', 'No payment API calls have been recorded yet.')}</p> : <div className="payment-log-list">{attempts.map((attempt) => <div className="payment-log-row" key={attempt.id}><div><strong>{attempt.operationType === 'TEST_CHARGE' ? t('테스트 결제', 'Test charge') : attempt.operationType === 'SUBSCRIPTION_CHARGE' ? t('구독 결제', 'Subscription charge') : t('결제수단 등록', 'Payment method registration')}</strong><small>{formatDate(attempt.createdAt, language)} · {attempt.status}{attempt.providerCode ? ` · ${attempt.providerCode}` : ''}</small></div>{attempt.status === 'FAILED' && attempt.operationType === 'TEST_CHARGE' && attempt.retryCount < 3 && <button type="button" disabled={pending} onClick={() => retry(attempt.id)}>{t('재전송', 'Retry')}</button>}</div>)}</div>}</section>
+    <section className="payment-panel"><h2>{t('API 호출 로그', 'API call log')}</h2>{!loading && attempts.length === 0 ? <p className="empty-state">{t('아직 결제 API 호출 기록이 없습니다.', 'No payment API calls have been recorded yet.')}</p> : <div className="payment-log-list">{attempts.map((attempt) => <div className="payment-log-row" key={attempt.id}><div><strong>{attemptLabel(attempt.operationType, t)}</strong><small>{formatDate(attempt.createdAt, language)} · {attempt.status}{attempt.providerCode ? ` · ${attempt.providerCode}` : ''}</small></div>{attempt.status === 'FAILED' && attempt.operationType === 'TEST_CHARGE' && attempt.retryCount < 3 && <button type="button" disabled={pending} onClick={() => retry(attempt.id)}>{t('재전송', 'Retry')}</button>}</div>)}</div>}</section>
   </main></>;
-}
-
-function loadTossSdk() {
-  if (window.TossPayments) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://js.tosspayments.com/v2/standard';
-    script.onload = () => resolve();
-    script.onerror = () => reject({ message: '토스페이먼츠 SDK를 불러오지 못했습니다.' });
-    document.head.appendChild(script);
-  });
 }
 
 function formatDate(value: string, language: 'ko' | 'en') {
   return new Intl.DateTimeFormat(language === 'ko' ? 'ko-KR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function attemptLabel(operation: PaymentAttempt['operationType'], t: (ko: string, en: string) => string) {
+  if (operation === 'TEST_CHARGE') return t('테스트 결제', 'Test charge');
+  if (operation === 'SUBSCRIPTION_CHARGE') return t('자동 구독 결제', 'Recurring subscription charge');
+  return t('결제수단 등록', 'Payment method registration');
 }

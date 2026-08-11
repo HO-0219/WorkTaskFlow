@@ -36,12 +36,13 @@ public class AiAssistantActionService {
     private final GroupMemberRepository members;
     private final NotificationService notifications;
     private final ObjectMapper objectMapper;
+    private final AiAssistantEntitlementService entitlement;
 
     public AiAssistantActionService(AiAssistantActionRepository actions, TaskService tasks,
             TaskChecklistService checklists, GroupInvitationService invitations,
             TaskCommentService comments, GroupAuthorization authorization,
             GroupMemberRepository members, NotificationService notifications,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper, AiAssistantEntitlementService entitlement) {
         this.actions = actions;
         this.tasks = tasks;
         this.checklists = checklists;
@@ -51,11 +52,13 @@ public class AiAssistantActionService {
         this.members = members;
         this.notifications = notifications;
         this.objectMapper = objectMapper;
+        this.entitlement = entitlement;
     }
 
     @Transactional
     public ActionResponse confirm(Long userId, Long actionId) {
         AiAssistantAction action = action(userId, actionId);
+        entitlement.require(userId, action.getGroup().getId());
         if (action.getStatus() == AiAssistantAction.Status.COMPLETED) {
             return new ActionResponse(actionId, "COMPLETED", "이미 실행한 작업입니다.", null, null, null);
         }

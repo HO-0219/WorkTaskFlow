@@ -28,19 +28,22 @@ public class AiAssistantChatService {
     private final UserRepository users;
     private final ObjectMapper objectMapper;
     private final AiAssistantMessageStore messages;
+    private final AiAssistantEntitlementService entitlement;
 
     public AiAssistantChatService(AiAssistantContextService contexts, AiAssistantGateway gateway,
             AiAssistantActionRepository actions, UserRepository users, ObjectMapper objectMapper,
-            AiAssistantMessageStore messages) {
+            AiAssistantMessageStore messages, AiAssistantEntitlementService entitlement) {
         this.contexts = contexts;
         this.gateway = gateway;
         this.actions = actions;
         this.users = users;
         this.objectMapper = objectMapper;
         this.messages = messages;
+        this.entitlement = entitlement;
     }
 
     public ChatResponse chat(Long userId, ChatRequest request) {
+        entitlement.require(userId, request.groupId());
         var context = contexts.load(userId, request.groupId());
         var history = messages.modelContext(userId, request.groupId());
         messages.append(userId, context.group(), AiAssistantMessage.Role.USER, request.message(), null);

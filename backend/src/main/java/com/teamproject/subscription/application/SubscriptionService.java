@@ -77,7 +77,7 @@ public class SubscriptionService {
     }
     public SubscriptionResponse activate(Long userId, Long groupId, ActivateSubscriptionRequest request,
             String ipAddress, String userAgent) {
-        if (!liveBillingEnabled) {
+        if (!liveBillingEnabled && !billing.testPaymentsEnabled()) {
             throw new ApplicationException("LIVE_BILLING_NOT_OPEN", HttpStatus.CONFLICT,
                     "사업자·통신판매업 및 운영 결제 승인이 완료된 뒤 유료 전환할 수 있습니다.");
         }
@@ -157,7 +157,8 @@ public class SubscriptionService {
         return new SubscriptionResponse(value.getId(), value.getGroup().getId(), value.getPlanCode(),
                 value.getStatus().name(), value.getAmount(), value.getCurrency(), value.getConversionChoice().name(),
                 value.getRolloutNoticeAt(), value.getDecisionDeadline(), value.getCurrentPeriodStart(),
-                value.getCurrentPeriodEnd(), value.getNextBillingAt(), liveBillingEnabled,
+                value.getCurrentPeriodEnd(), value.getNextBillingAt(),
+                liveBillingEnabled || billing.testPaymentsEnabled(),
                 value.getStatus() == GroupSubscription.Status.FREE && value.getCurrentPeriodStart() == null);
     }
 }

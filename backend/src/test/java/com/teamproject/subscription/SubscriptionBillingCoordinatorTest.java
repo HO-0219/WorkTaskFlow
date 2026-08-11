@@ -36,7 +36,7 @@ class SubscriptionBillingCoordinatorTest {
                 LocalDateTime.of(2026, 8, 1, 0, 0), ChargeKind.ACTIVATION);
         when(toss.configured()).thenReturn(true);
         when(cipher.configured()).thenReturn(true);
-        when(cipher.decrypt("encrypted")).thenReturn("billing-key");
+        lenient().when(cipher.decrypt("encrypted")).thenReturn("billing-key");
     }
 
     @Test
@@ -75,4 +75,5 @@ class SubscriptionBillingCoordinatorTest {
         verify(transactions).recordFailure(charge, null, "TOSS_NETWORK_ERROR", "network error", true, now);
         verify(transactions, never()).completeActivation(any(), any(), anyInt(), any());
     }
+
 }

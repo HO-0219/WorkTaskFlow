@@ -21,16 +21,20 @@ public class AiAssistantMessageStore {
     private final AiAssistantMessageRepository messages;
     private final GroupAuthorization authorization;
     private final UserRepository users;
+    private final AiAssistantEntitlementService entitlement;
 
     public AiAssistantMessageStore(AiAssistantMessageRepository messages,
-            GroupAuthorization authorization, UserRepository users) {
+            GroupAuthorization authorization, UserRepository users,
+            AiAssistantEntitlementService entitlement) {
         this.messages = messages;
         this.authorization = authorization;
         this.users = users;
+        this.entitlement = entitlement;
     }
 
     @Transactional(readOnly = true)
     public List<MessageResponse> list(Long userId, Long groupId) {
+        entitlement.require(userId, groupId);
         authorization.requireActiveMember(groupId, userId);
         return chronological(messages.findByUserIdAndGroupIdOrderByIdDesc(
                 userId, groupId, PageRequest.of(0, DISPLAY_LIMIT))).stream()
@@ -39,6 +43,7 @@ public class AiAssistantMessageStore {
 
     @Transactional(readOnly = true)
     public List<ChatMessage> modelContext(Long userId, Long groupId) {
+        entitlement.require(userId, groupId);
         authorization.requireActiveMember(groupId, userId);
         return chronological(messages.findByUserIdAndGroupIdOrderByIdDesc(
                 userId, groupId, PageRequest.of(0, MODEL_CONTEXT_LIMIT))).stream()
