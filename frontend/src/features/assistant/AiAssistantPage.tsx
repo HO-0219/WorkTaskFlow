@@ -131,7 +131,8 @@ export function AiAssistantPage() {
     <section className="assistant-chat" aria-label={t('AI 비서 대화', 'AI assistant chat')}>
       <div className="assistant-messages" aria-live="polite">{items.map((item) =>
         <article className={`assistant-message ${item.role}`} key={item.id}>
-          <span>{item.role === 'assistant' ? 'AI' : t('나', 'Me')}</span><p>{item.content}</p>
+          <span>{item.role === 'assistant' ? 'AI' : t('나', 'Me')}</span>
+          <p>{item.role === 'assistant' ? renderBold(item.content) : item.content}</p>
           {item.actionId && item.actionSummary && <div className="assistant-action-card">
             <strong>{item.actionSummary}</strong>
             {!item.actionResult && <div><button type="button" disabled={pending} onClick={() => decide(item, true)}>{t('확인하고 실행', 'Confirm and run')}</button>
@@ -157,6 +158,13 @@ export function AiAssistantPage() {
         <button type="submit" disabled={!message.trim() || !groupId || pending}>{t('보내기', 'Send')}</button></form>
     </section>
   </main></>;
+}
+
+function renderBold(content: string) {
+  const parts = content.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => part.startsWith('**') && part.endsWith('**')
+    ? <strong key={index}>{part.slice(2, -2)}</strong>
+    : <span key={index}>{part}</span>);
 }
 
 function assistantMessage(content: string): ChatItem {
