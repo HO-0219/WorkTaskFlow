@@ -80,6 +80,8 @@ public class WebPushDeliveryService {
         byte[] payload;
         try {
             payload = objectMapper.writeValueAsString(new Payload(
+                    event.notificationId(), event.notificationType(),
+                    event.groupId(), event.taskId(), event.commentId(),
                     event.title(), event.message(), event.targetUrl(), event.tag()))
                     .getBytes(StandardCharsets.UTF_8);
         } catch (JsonProcessingException exception) {
@@ -144,5 +146,7 @@ public class WebPushDeliveryService {
         }
     }
 
-    private record Payload(String title, String body, String url, String tag) {}
+    private record Payload(Long notificationId, String notificationType,
+            Long groupId, Long taskId, Long commentId,
+            String title, String body, String url, String tag) {}
 }

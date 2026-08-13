@@ -8,6 +8,7 @@ import { groupApi, GroupResponse } from '../../../api/groupApi';
 import { AiWeeklyReportAction } from '../../report/components/AiWeeklyReportAction';
 import { ChecklistDraftField, cleanChecklistDraft } from '../../task/components/ChecklistDraftField';
 import { useLanguage } from '../../../app/LanguageContext';
+import { subscribeToLiveUpdates } from '../../../app/liveUpdates';
 
 const statusLabels: Record<string, [string, string]> = { requested: ['승인 대기', 'Pending approval'], todo: ['할 일', 'To do'], inProgress: ['진행 중', 'In progress'], onHold: ['보류', 'On hold'], completed: ['완료', 'Completed'], rejected: ['반려', 'Rejected'], cancelled: ['취소', 'Cancelled'], delayed: ['지연', 'Overdue'] };
 const taskStatusLabels: Record<string, [string, string]> = { REQUESTED: ['승인 대기', 'Pending approval'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'], COMPLETED: ['완료', 'Completed'], REJECTED: ['반려', 'Rejected'], CANCELLED: ['취소', 'Cancelled'] };
@@ -55,11 +56,15 @@ export function GroupDashboardPage() {
     }).catch((value) => setError(errorMessage(value)));
   }, [groupId]);
   useEffect(() => { load(); }, [groupId, range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
-  async function load() {
-    setLoading(true); setError('');
+  useEffect(() => subscribeToLiveUpdates((update) => {
+    if (update.groupId === groupId) void load(true);
+  }), [groupId, range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
+    setError('');
     try { setDashboard(await dashboardApi.group(groupId, range.from, range.to)); }
     catch (value) { setError(errorMessage(value)); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }
   async function createTask(event: FormEvent) {
     event.preventDefault();

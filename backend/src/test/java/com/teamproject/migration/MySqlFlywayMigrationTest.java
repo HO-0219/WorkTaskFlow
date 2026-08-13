@@ -23,7 +23,7 @@ class MySqlFlywayMigrationTest {
                     .withPassword("worktaskflow");
 
     @Test
-    void migratesFreshMySqlSchemaFromV1ThroughV39() throws Exception {
+    void migratesFreshMySqlSchemaFromV1ThroughV43() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
@@ -31,7 +31,7 @@ class MySqlFlywayMigrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("39");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("43");
         assertThat(countSchemaObjects(
                 "information_schema.tables",
                 "table_name",
@@ -42,8 +42,16 @@ class MySqlFlywayMigrationTest {
                         "weekly_objectives",
                         "task_weekly_objective_links",
                         "ai_assistant_actions",
-                        "ai_assistant_messages")))
-                .isEqualTo(7);
+                        "ai_assistant_messages",
+                        "projects",
+                        "project_issue_nodes",
+                        "project_issue_checklist_items",
+                        "project_issue_images",
+                        "project_documents",
+                        "chat_channels",
+                        "chat_messages",
+                        "chat_socket_tickets")))
+                .isEqualTo(15);
         assertThat(countColumns(
                 "reports",
                 List.of(
@@ -74,6 +82,29 @@ class MySqlFlywayMigrationTest {
                 "group_subscriptions",
                 List.of("billing_claim_key", "billing_claimed_at")))
                 .isEqualTo(2);
+        assertThat(countColumns(
+                "projects",
+                List.of(
+                        "group_id",
+                        "lead_member_id",
+                        "created_by_member_id",
+                        "status",
+                        "start_date",
+                        "due_date",
+                        "version")))
+                .isEqualTo(7);
+        assertThat(countColumns(
+                "project_issue_nodes",
+                List.of("project_id", "parent_id", "assignee_member_id", "level", "status", "archived_at", "version")))
+                .isEqualTo(7);
+        assertThat(countColumns(
+                "project_documents",
+                List.of("project_id", "issue_node_id", "document_type", "storage_key", "size_bytes", "deleted_at")))
+                .isEqualTo(6);
+        assertThat(countColumns(
+                "chat_messages",
+                List.of("channel_id", "sender_member_id", "message_type", "storage_key", "size_bytes", "created_at")))
+                .isEqualTo(6);
     }
 
     private long countColumns(String table, List<String> columns) throws Exception {

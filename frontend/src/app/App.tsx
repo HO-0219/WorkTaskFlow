@@ -29,6 +29,9 @@ import { SessionKeepAlive } from './SessionKeepAlive';
 import { AdminPage } from '../features/admin/AdminPage';
 import { DemoPage } from './DemoPage';
 import { AiAssistantPage } from '../features/assistant/AiAssistantPage';
+import { ProjectsPage } from '../features/project/pages/ProjectsPage';
+import { ProjectFlowPage } from '../features/project/pages/ProjectFlowPage';
+import { ChatPage } from '../features/chat/ChatPage';
 
 export default function App() {
   return <LanguageProvider><BrowserRouter>
@@ -58,6 +61,9 @@ export default function App() {
     <Route path="/groups/:groupId" element={<GroupDetailPage />} />
     <Route path="/groups/:groupId/members" element={<GroupMembersPage />} />
     <Route path="/groups/:groupId/tasks" element={<TasksPage />} />
+    <Route path="/groups/:groupId/projects" element={<ProjectsPage />} />
+    <Route path="/groups/:groupId/chat" element={<ChatPage />} />
+    <Route path="/projects/:projectId/flow" element={<ProjectFlowPage />} />
     <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
     <Route path="/assistant" element={<AiAssistantPage />} />
@@ -113,7 +119,7 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
     if (pathname === '/payments') return 'Payments'; if (pathname === '/admin') return 'Admin';
     if (pathname === '/product') return 'Product'; if (pathname === '/b2b') return 'B2B solutions'; if (pathname === '/pricing') return 'Pricing'; if (pathname === '/contact') return 'Contact';
     if (pathname === '/paid-terms') return 'Paid service terms'; if (pathname === '/refund-policy') return 'Refund policy';
-    if (/\/dashboard$/.test(pathname)) return 'Group dashboard'; if (/\/members$/.test(pathname)) return 'Team members'; if (/\/tasks$/.test(pathname)) return 'Tasks'; if (/^\/tasks\//.test(pathname)) return 'Task details';
+    if (/\/dashboard$/.test(pathname)) return 'Group dashboard'; if (/\/members$/.test(pathname)) return 'Team members'; if (/\/chat$/.test(pathname)) return 'Group chat'; if (/\/projects$/.test(pathname)) return 'Projects'; if (/^\/projects\/\d+\/flow$/.test(pathname)) return 'Project issue flow'; if (/\/tasks$/.test(pathname)) return 'Tasks'; if (/^\/tasks\//.test(pathname)) return 'Task details';
     if (/^\/groups\/\d+$/.test(pathname)) return 'Group settings'; if (pathname === '/signup') return 'Sign up'; if (pathname === '/login') return 'Log in';
     if (pathname === '/find-username') return 'Find username'; if (pathname === '/forgot-password' || pathname === '/reset-password') return 'Reset password';
     if (pathname === '/oauth/consent') return 'Google sign-up consent';
@@ -127,6 +133,9 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (/^\/groups\/\d+\/dashboard$/.test(pathname)) return '그룹 대시보드';
   if (/^\/groups\/\d+\/members$/.test(pathname)) return '팀원 목록';
   if (/^\/groups\/\d+\/tasks$/.test(pathname)) return '업무 목록';
+  if (/^\/groups\/\d+\/projects$/.test(pathname)) return '프로젝트 목록';
+  if (/^\/groups\/\d+\/chat$/.test(pathname)) return '그룹 채팅';
+  if (/^\/projects\/\d+\/flow$/.test(pathname)) return '프로젝트 이슈 Flow';
   if (/^\/tasks\/\d+$/.test(pathname)) return '업무 상세';
   if (pathname === '/groups') return '그룹 목록';
   if (/^\/groups\/\d+$/.test(pathname)) return '그룹 상세';

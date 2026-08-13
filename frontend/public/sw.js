@@ -21,7 +21,7 @@ self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data?.json() ?? {}; } catch { data = { body: event.data?.text() ?? '' }; }
   const target = typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/notifications';
-  event.waitUntil(self.registration.showNotification(data.title || 'Gearvia', {
+  const notification = self.registration.showNotification(data.title || 'Gearvia', {
     body: data.body || '새 알림이 도착했습니다.',
     icon: '/icons/app-icon-192.png',
     badge: '/icons/app-icon-192.png',
@@ -29,7 +29,10 @@ self.addEventListener('push', (event) => {
     data: { url: target },
     silent: true,
     requireInteraction: true,
-  }));
+  });
+  const updateOpenApps = self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((clients) => clients.forEach((client) => client.postMessage({ type: 'PUSH_RECEIVED', data })));
+  event.waitUntil(Promise.all([notification, updateOpenApps]));
 });
 
 self.addEventListener('notificationclick', (event) => {

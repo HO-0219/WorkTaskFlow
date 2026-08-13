@@ -4,6 +4,7 @@ import { accessToken, errorMessage } from '../../../api/client';
 import { notificationApi, NotificationResponse } from '../../../api/notificationApi';
 import { AppNavigation } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
+import { subscribeToLiveUpdates } from '../../../app/liveUpdates';
 
 export function NotificationsPage() {
   const { t, language } = useLanguage();
@@ -35,6 +36,7 @@ export function NotificationsPage() {
   }, [items.length]);
 
   useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => subscribeToLiveUpdates(() => { void reload(true); }), [reload]);
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') reload(true);

@@ -72,6 +72,17 @@ export type ReportAccessResponse = {
   remainingThisWeek?: number;
 };
 
+export type GroupFeaturePolicy = {
+  groupId: number;
+  membershipPlan: 'FREE' | 'PAID';
+  projectEnabled: boolean;
+  multipleChatChannels: boolean;
+  chatChannelLimit: number;
+  messageRetentionDays: number;
+  storageLimitBytes: number;
+  attachmentLimitBytes: number;
+};
+
 export const groupApi = {
   list: () => request<GroupResponse[]>('/groups', {}, true),
   create: (body: CreateGroupRequest) => request<GroupResponse>('/groups', {
@@ -98,6 +109,7 @@ export const groupApi = {
     body: JSON.stringify(input),
   }),
   get: (groupId: number) => request<GroupResponse>(`/groups/${groupId}`, {}, true),
+  features: (groupId: number) => request<GroupFeaturePolicy>(`/groups/${groupId}/features`, {}, true),
   update: (groupId: number, body: UpdateGroupRequest) => request<GroupResponse>(`/groups/${groupId}`, {
     method: 'PATCH', body: JSON.stringify(body),
   }, true),

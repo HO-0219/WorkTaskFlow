@@ -7,6 +7,7 @@ import { BlockerNextActionType, BlockerType, ChecklistItemResponse, ChecklistRes
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
 import { ResourcePanel } from '../../resource/ResourcePanel';
+import { subscribeToLiveUpdates } from '../../../app/liveUpdates';
 
 const statusLabels: Record<TaskResponse['status'], [string, string]> = {
   REQUESTED: ['승인 대기', 'Pending approval'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'],
@@ -80,6 +81,23 @@ export function TaskDetailPage() {
       syncEditFields(taskValue);
     }).catch((caught) => setError(errorMessage(caught))).finally(() => setLoading(false));
   }, [taskId]);
+
+  useEffect(() => subscribeToLiveUpdates((update) => {
+    if (update.taskId !== taskId) return;
+    Promise.all([
+      taskApi.get(taskId), taskApi.histories(taskId), taskApi.checklist(taskId), commentApi.list(taskId),
+    ]).then(([taskValue, historyValues, checklistValue, commentValues]) => {
+      setHistories(historyValues);
+      setChecklist(checklistValue);
+      setComments(commentValues);
+      // 편집 중인 본문과 optimistic-lock 버전은 유지해 다른 사용자의 변경을 덮어쓰지 않는다.
+      if (!editing) {
+        setTask(taskValue);
+        setAssigneeMemberId(taskValue.assigneeMemberId?.toString() ?? '');
+        syncEditFields(taskValue);
+      }
+    }).catch(() => undefined);
+  }), [taskId, editing]);
 
   async function transition(action: TaskAction) {
     if (!task) return;

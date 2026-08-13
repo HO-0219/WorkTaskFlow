@@ -229,7 +229,13 @@ public class NotificationService {
                 : notification.getType() == Notification.Type.SUBSCRIPTION_ROLLOUT_NOTICE
                         && notification.getGroup() != null ? "/groups/" + notification.getGroup().getId()
                 : "/notifications";
-        events.publishEvent(new PushNotificationEvent(notification.getRecipient().getId(),
+        events.publishEvent(new PushNotificationEvent(
+                notification.getRecipient().getId(),
+                notification.getId(),
+                notification.getType().name(),
+                notification.getGroup() == null ? null : notification.getGroup().getId(),
+                notification.getTask() == null ? null : notification.getTask().getId(),
+                notification.getComment() == null ? null : notification.getComment().getId(),
                 notification.getTitle(), notification.getMessage(), targetUrl,
                 "notification-" + notification.getId()));
     }

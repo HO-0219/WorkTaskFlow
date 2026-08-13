@@ -3,6 +3,7 @@ package com.teamproject.group.presentation;
 import com.teamproject.group.application.GroupService;
 import com.teamproject.group.application.GroupInvitationService;
 import com.teamproject.group.application.GroupMemberService;
+import com.teamproject.group.application.GroupFeaturePolicy;
 import com.teamproject.report.application.BasicReportAccessService;
 import com.teamproject.group.application.dto.GroupDtos.CreateGroupRequest;
 import com.teamproject.group.application.dto.GroupDtos.GroupResponse;
@@ -30,13 +31,20 @@ public class GroupController {
     private final GroupInvitationService invitations;
     private final GroupMemberService members;
     private final BasicReportAccessService reports;
+    private final GroupFeaturePolicy features;
 
     public GroupController(GroupService groups, GroupInvitationService invitations, GroupMemberService members,
-            BasicReportAccessService reports) {
+            BasicReportAccessService reports, GroupFeaturePolicy features) {
         this.groups = groups;
         this.invitations = invitations;
         this.members = members;
         this.reports = reports;
+        this.features = features;
+    }
+
+    @GetMapping("/{groupId}/features")
+    GroupFeaturePolicy.FeaturePolicyResponse features(Authentication authentication, @PathVariable Long groupId) {
+        return features.policy((Long) authentication.getPrincipal(), groupId);
     }
 
     @GetMapping

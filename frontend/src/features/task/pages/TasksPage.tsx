@@ -6,6 +6,7 @@ import { taskApi, TaskPriority, TaskResponse } from '../../../api/taskApi';
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
 import { ChecklistDraftField, cleanChecklistDraft } from '../components/ChecklistDraftField';
+import { subscribeToLiveUpdates } from '../../../app/liveUpdates';
 
 const statusLabels: Record<TaskResponse['status'], [string, string]> = {
   REQUESTED: ['승인 대기', 'Pending approval'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'],
@@ -43,6 +44,11 @@ export function TasksPage() {
       .catch((caught) => setError(errorMessage(caught)))
       .finally(() => setLoading(false));
   }, [groupId]);
+
+  useEffect(() => subscribeToLiveUpdates((update) => {
+    if (update.groupId !== groupId) return;
+    taskApi.list(groupId).then(setTasks).catch(() => undefined);
+  }), [groupId]);
 
   async function create(event: FormEvent) {
     event.preventDefault();

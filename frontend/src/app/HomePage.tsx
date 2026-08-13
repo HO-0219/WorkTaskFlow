@@ -8,6 +8,7 @@ import { groupApi, GroupResponse } from '../api/groupApi';
 import { AppNavigation } from './AppNavigation';
 import { useLanguage } from './LanguageContext';
 import { AuthenticatedImage } from './AuthenticatedImage';
+import { subscribeToLiveUpdates } from './liveUpdates';
 
 export function HomePage() {
   const { t, language } = useLanguage();
@@ -44,6 +45,13 @@ export function HomePage() {
     }
     load();
   }, []);
+  useEffect(() => subscribeToLiveUpdates(() => {
+    Promise.all([dashboardApi.personal(), notificationApi.list(1)])
+      .then(([dashboardValue, notificationPage]) => {
+        setDashboard(dashboardValue);
+        setUnreadCount(notificationPage.unreadCount);
+      }).catch(() => undefined);
+  }), []);
   if (loading) return <main className="center-page">{t('인증 상태 확인 중...', 'Checking your session...')}</main>;
   if (!me && loadError) return <main className="center-page session-unavailable" role="alert"><div><h1>{t('서비스에 연결할 수 없습니다.', 'The service is unavailable.')}</h1><p>{loadError}</p><button type="button" onClick={() => window.location.reload()}>{t('다시 시도', 'Try again')}</button></div></main>;
   if (!me) return <Navigate to="/login" replace />;
