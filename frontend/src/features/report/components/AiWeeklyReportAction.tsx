@@ -228,6 +228,7 @@ export function AiWeeklyReportAction({ groupId, group, selection }: Props) {
           onClose={() => { if (!pending) setShowLanguageChoice(false); }}
         >
           {/* 생성할 수 없는 이유와 결과 문구는 모두 이 안에서만 보여 준다. */}
+          <div className="ai-report-generation-intro"><span>✦</span><div><strong>{t('업무 기록을 실행 가능한 브리프로 정리합니다.', 'Turn work records into an actionable brief.')}</strong><p>{t('완료율만 나열하지 않고, 기간 내 변화와 위험 업무, 다음 행동을 함께 분석합니다.', 'It goes beyond completion rates to analyze changes, at-risk work, and next actions.')}</p></div><ul><li>{t('핵심 지표', 'Key metrics')}</li><li>{t('위험·변화', 'Risks & changes')}</li><li>{t('다음 행동', 'Next actions')}</li></ul></div>
           {unavailableReason && <p className="error">{unavailableReason}</p>}
           {message && <p className={failed ? 'error' : 'success-message'}>{message}</p>}
 

@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../api/client';
-import { PaymentMethod, paymentApi } from '../../api/paymentApi';
+import { PaymentConfig, PaymentMethod, paymentApi } from '../../api/paymentApi';
 import { reportApi, ReportSchedule } from '../../api/reportApi';
 import { Subscription, subscriptionApi } from '../../api/subscriptionApi';
 import { useLanguage } from '../../app/LanguageContext';
+import { loadTossSdk } from '../../app/tossPayments';
 
 export function SubscriptionPanel({ groupId }: { groupId: number }) {
   const { t, language } = useLanguage();
@@ -14,19 +15,44 @@ export function SubscriptionPanel({ groupId }: { groupId: number }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig>();
   const [paymentMethodId, setPaymentMethodId] = useState<number>();
+  const [paymentModal, setPaymentModal] = useState(false);
   const [billingConsent, setBillingConsent] = useState(false);
   const [policyConsent, setPolicyConsent] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [editingRecipient, setEditingRecipient] = useState(false);
+  const redirectHandled = useRef(false);
   useEffect(() => {
-    Promise.all([subscriptionApi.get(groupId), reportApi.schedule(groupId), paymentApi.methods()])
-      .then(([value, report, paymentMethods]) => {
-        setSubscription(value); setSchedule(report); setRecipientEmail(report.recipientEmail);
+    if (redirectHandled.current) return;
+    redirectHandled.current = true;
+    const query = new URLSearchParams(window.location.search);
+    const authKey = query.get('authKey');
+    const customerKey = query.get('customerKey');
+    const failureCode = query.get('code');
+    const clearPaymentQuery = () => window.history.replaceState({}, '', `${window.location.pathname}?tab=plan`);
+    (async () => {
+      setPending(Boolean(authKey));
+      try {
+        if (failureCode) {
+          clearPaymentQuery();
+          throw { message: t('결제가 취소되었거나 인증에 실패했습니다.', 'Payment was cancelled or authorization failed.') };
+        }
+        if (authKey && customerKey) {
+          await paymentApi.issue(authKey, customerKey);
+          setMessage(t('자동결제 수단을 등록했습니다. 결제 버튼을 눌러 구독을 시작해 주세요.', 'Recurring payment method added. Complete the subscription payment below.'));
+          setPaymentModal(true);
+          clearPaymentQuery();
+        }
+        const [value, report, paymentMethods, config] = await Promise.all([
+          subscriptionApi.get(groupId), reportApi.schedule(groupId), paymentApi.methods(), paymentApi.config(),
+        ]);
+        setSubscription(value); setSchedule(report); setRecipientEmail(report.recipientEmail); setPaymentConfig(config);
         const activeMethods = paymentMethods.filter((method) => method.status === 'ACTIVE');
         setMethods(activeMethods); setPaymentMethodId(activeMethods[0]?.id);
-      })
-      .catch((value) => setError(errorMessage(value)));
+      } catch (value) { setError(errorMessage(value)); }
+      finally { setPending(false); }
+    })();
   }, [groupId]);
   async function trial() {
     setPending(true); setError('');
@@ -46,12 +72,25 @@ export function SubscriptionPanel({ groupId }: { groupId: number }) {
   }
   async function activate() {
     if (!paymentMethodId || !billingConsent || !policyConsent) return;
-    if (!window.confirm(t(`월 ₩${subscription?.amount.toLocaleString()} 자동결제를 시작할까요?`, `Start recurring billing at KRW ${subscription?.amount.toLocaleString()} per month?`))) return;
     setPending(true); setError(''); setMessage('');
     try {
+      if (subscription?.conversionChoice !== 'CONTINUE_PAID') await subscriptionApi.choose(groupId, 'CONTINUE_PAID');
       setSubscription(await subscriptionApi.activate(groupId, paymentMethodId));
-      setMessage(t('유료 구독이 활성화됐습니다.', 'Paid subscription activated.'));
+      setPaymentModal(false);
+      setMessage(t('결제가 승인되어 그룹 멤버십과 AI 비서가 활성화됐습니다.', 'Payment approved. Group membership and AI assistant are now active.'));
+      window.dispatchEvent(new Event('groups:refresh'));
+      window.dispatchEvent(new CustomEvent('group:subscription-activated', { detail: { groupId } }));
     } catch (value) { setError(errorMessage(value)); } finally { setPending(false); }
+  }
+  async function registerRecurringMethod() {
+    if (!paymentConfig?.configured || !paymentConfig.clientKey || !paymentConfig.customerKey) return;
+    setPending(true); setError('');
+    try {
+      await loadTossSdk();
+      const payment = window.TossPayments!(paymentConfig.clientKey).payment({ customerKey: paymentConfig.customerKey });
+      const callback = `${window.location.origin}/groups/${groupId}?tab=plan`;
+      await payment.requestBillingAuth({ method: 'CARD', successUrl: callback, failUrl: callback });
+    } catch (value) { setError(errorMessage(value)); setPending(false); }
   }
   async function saveSchedule(event: FormEvent) {
     event.preventDefault(); if (!schedule) return;
@@ -78,15 +117,7 @@ export function SubscriptionPanel({ groupId }: { groupId: number }) {
       <Link className="secondary" to="/payments">{t('결제수단 관리', 'Payment methods')}</Link>
       {!subscription.liveBillingEnabled && <small>{t('실결제는 사업자·통신판매업 및 PG 운영 승인이 끝날 때까지 잠겨 있습니다.', 'Live billing stays locked until business and PG approval.')}</small>}
     </div></div>
-    {subscription.liveBillingEnabled && !['ACTIVE', 'CANCEL_AT_PERIOD_END'].includes(subscription.status) && <div className="subscription-activation"><h3>{t('유료 구독 시작', 'Start paid subscription')}</h3>
-      {methods.length === 0 ? <p>{t('먼저 결제수단을 등록해 주세요.', 'Add a payment method first.')} <Link to="/payments">{t('결제수단 등록', 'Add payment method')} →</Link></p> : <>
-        <label>{t('결제수단', 'Payment method')}<select value={paymentMethodId ?? ''} onChange={(event) => setPaymentMethodId(Number(event.target.value))}>{methods.map((method) => <option value={method.id} key={method.id}>{method.maskedNumber || t('등록된 카드', 'Saved card')}</option>)}</select></label>
-        <label><input type="checkbox" checked={billingConsent} onChange={(event) => setBillingConsent(event.target.checked)} /> {t(`월 ₩${subscription.amount.toLocaleString()} 정기결제와 자동 갱신에 동의합니다.`, `I agree to recurring monthly billing of KRW ${subscription.amount.toLocaleString()} and automatic renewal.`)}</label>
-        <label><input type="checkbox" checked={policyConsent} onChange={(event) => setPolicyConsent(event.target.checked)} /> <Link to="/paid-terms" target="_blank">{t('유료서비스 약관', 'Paid terms')}</Link> · <Link to="/refund-policy" target="_blank">{t('환불 정책', 'Refund policy')}</Link>{t('에 동의합니다.', ' accepted.')}</label>
-        <button className="primary" type="button" disabled={pending || !paymentMethodId || !billingConsent || !policyConsent || subscription.conversionChoice !== 'CONTINUE_PAID'} onClick={activate}>{t('유료 구독 시작', 'Start paid subscription')}</button>
-        {subscription.conversionChoice !== 'CONTINUE_PAID' && <small>{t('위의 “유료 전환 희망”을 먼저 선택해 주세요.', 'Choose “Continue paid” above first.')}</small>}
-      </>}
-    </div>}
+    {subscription.liveBillingEnabled && !['ACTIVE', 'CANCEL_AT_PERIOD_END'].includes(subscription.status) && <div className="subscription-activation"><h3>{t('멤버십 정기결제', 'Membership subscription')}</h3><p>{t('카드를 한 번 등록하면 매월 같은 날짜에 자동 갱신됩니다.', 'Register a card once to renew automatically on the same date each month.')}</p><button className="primary" type="button" disabled={pending || !paymentConfig?.configured} onClick={() => setPaymentModal(true)}>{t('정기결제 시작', 'Start subscription')}</button></div>}
     <form className="report-schedule-form" onSubmit={saveSchedule}><header><div><span className="page-eyebrow">EMAIL REPORT</span><h3>{t('메일 리포트 일정', 'Email report schedule')}</h3><p>{t('원하는 주기와 언어로 팀 업무 요약을 받아보세요.', 'Receive team summaries on your preferred schedule and language.')}</p></div><span className="report-schedule-state">{schedule.weeklyEnabled || schedule.monthlyEnabled ? t('발송 설정됨', 'Scheduled') : t('발송 꺼짐', 'Disabled')}</span></header>
       <label className="report-cycle-toggle"><span><input type="checkbox" checked={schedule.weeklyEnabled} disabled={!schedule.weeklyEligible} onChange={(event) => setSchedule({ ...schedule, weeklyEnabled: event.target.checked })} /><i /></span><strong>{t('주간 리포트', 'Weekly report')}</strong><small>{t('선택한 요일 오전에 발송', 'Delivered in the morning on your chosen day')}</small></label>
       <label className="report-select-field"><span>{t('발송 요일', 'Delivery day')}</span><select value={schedule.weeklyDay ?? 'MONDAY'} disabled={!schedule.weeklyEnabled} onChange={(event) => setSchedule({ ...schedule, weeklyDay: event.target.value })}>{weekdays.map(([value, ko, en]) => <option value={value} key={value}>{t(ko, en)}</option>)}</select></label>
@@ -98,13 +129,21 @@ export function SubscriptionPanel({ groupId }: { groupId: number }) {
       <div className={`report-email-field ${editingRecipient ? 'editing' : ''}`}><div><span>{t('수신 이메일', 'Recipient email')}</span>{editingRecipient ? <button type="button" onClick={() => { setRecipientEmail(schedule.recipientEmail); setEditingRecipient(false); }}>{t('취소', 'Cancel')}</button> : <button type="button" onClick={() => setEditingRecipient(true)}>{t('수정', 'Edit')}</button>}</div><label><span aria-hidden="true">@</span><input type="email" value={recipientEmail} required maxLength={255} readOnly={!editingRecipient} onChange={(event) => setRecipientEmail(event.target.value)} /></label><small>{editingRecipient ? t('새 수신 주소를 입력한 뒤 아래 저장 버튼을 눌러주세요.', 'Enter a new recipient and save the schedule below.') : t('실수로 바뀌지 않도록 잠겨 있습니다.', 'Locked to prevent accidental changes.')}</small></div>
       <footer><small>{t('일정 변경은 저장 후 다음 발송부터 적용됩니다.', 'Changes apply from the next delivery after saving.')}</small><button className="primary" disabled={pending}>{pending ? t('저장 중...', 'Saving...') : t('메일 일정 저장', 'Save schedule')}</button></footer>
     </form>{message && <p className="success-message">{message}</p>}{error && <p className="error">{error}</p>}
+    {paymentModal && <div className="payment-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) setPaymentModal(false); }}><section className="payment-choice-modal" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title"><header><div><span className="page-eyebrow">RECURRING PAYMENT</span><h3 id="payment-modal-title">{t('멤버십 정기결제', 'Membership subscription')}</h3><p>{t('매월 자동 갱신되는 카드 결제입니다.', 'Recurring card billing that renews monthly.')}</p></div><button type="button" aria-label={t('닫기', 'Close')} disabled={pending} onClick={() => setPaymentModal(false)}>×</button></header>
+      <div className="payment-recurring-summary"><span>↻</span><div><strong>{t('카드 자동결제', 'Recurring card')}</strong><small>{t(`월 ₩${subscription.amount.toLocaleString()} · 매월 자동 갱신`, `KRW ${subscription.amount.toLocaleString()}/month · Auto-renewing`)}</small></div></div>
+      {methods.length > 0 && <label className="payment-saved-method"><span>{t('등록된 결제수단', 'Saved payment method')}</span><select value={paymentMethodId ?? ''} onChange={(event) => setPaymentMethodId(Number(event.target.value))}>{methods.map((method) => <option value={method.id} key={method.id}>{method.maskedNumber || t('등록된 카드', 'Saved card')}</option>)}</select></label>}
+      <label className="payment-consent"><input type="checkbox" checked={billingConsent} onChange={(event) => setBillingConsent(event.target.checked)} /> {t(`월 ₩${subscription.amount.toLocaleString()} 정기결제와 자동 갱신에 동의합니다.`, `I agree to recurring monthly billing of KRW ${subscription.amount.toLocaleString()}.`)}</label>
+      <label className="payment-consent"><input type="checkbox" checked={policyConsent} onChange={(event) => setPolicyConsent(event.target.checked)} /> <span><Link to="/paid-terms" target="_blank">{t('유료서비스 약관', 'Paid terms')}</Link> · <Link to="/refund-policy" target="_blank">{t('환불 정책', 'Refund policy')}</Link>{t('에 동의합니다.', ' accepted.')}</span></label>
+      {paymentConfig?.testMode && <p className="payment-test-banner">{t('테스트 결제 모드: 실제 금액은 출금되지 않습니다.', 'Test mode: no real money will be charged.')}</p>}
+      <footer><button className="secondary" type="button" disabled={pending} onClick={() => setPaymentModal(false)}>{t('취소', 'Cancel')}</button>{methods.length === 0 ? <button className="primary" type="button" disabled={pending || !billingConsent || !policyConsent} onClick={registerRecurringMethod}>{t('카드 등록하기', 'Add recurring card')}</button> : <button className="primary" type="button" disabled={pending || !billingConsent || !policyConsent || !paymentMethodId} onClick={activate}>{pending ? t('처리 중...', 'Processing...') : t(`월 ₩${subscription.amount.toLocaleString()} 시작`, `Start at KRW ${subscription.amount.toLocaleString()}/mo`)}</button>}</footer>
+    </section></div>}
   </section>;
 }
 const weekdays = [['MONDAY', '월요일', 'Monday'], ['TUESDAY', '화요일', 'Tuesday'], ['WEDNESDAY', '수요일', 'Wednesday'], ['THURSDAY', '목요일', 'Thursday'], ['FRIDAY', '금요일', 'Friday'], ['SATURDAY', '토요일', 'Saturday'], ['SUNDAY', '일요일', 'Sunday']] as const;
 function subscriptionStatus(status: string, language: 'ko' | 'en') {
   const labels: Record<string, [string, string]> = {
     FREE: ['무료', 'Free'], TRIALING: ['무료 체험', 'Trial'], ACTIVE: ['구독 중', 'Active'],
-    CANCEL_AT_PERIOD_END: ['해지 예정', 'Cancels at period end'], CANCELED: ['해지됨', 'Canceled'],
+    CANCEL_AT_PERIOD_END: ['기간 종료 예정', 'Ends at period end'], CANCELLED: ['해지됨', 'Canceled'],
     PAST_DUE: ['결제 확인 필요', 'Past due'],
   };
   return labels[status]?.[language === 'ko' ? 0 : 1] ?? status;

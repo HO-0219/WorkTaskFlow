@@ -52,6 +52,15 @@ export function GroupDetailPage() {
     }).catch((value) => setError(errorMessage(value))).finally(() => setLoading(false));
   }, [groupId]);
 
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      const targetGroupId = (event as CustomEvent<{ groupId: number }>).detail?.groupId;
+      if (targetGroupId === groupId) groupApi.get(groupId).then(setGroup).catch(() => undefined);
+    };
+    window.addEventListener('group:subscription-activated', refresh);
+    return () => window.removeEventListener('group:subscription-activated', refresh);
+  }, [groupId]);
+
   async function update(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -248,15 +257,15 @@ export function GroupDetailPage() {
     </form></section> : <section className="group-settings-section readonly-settings"><header><h2>{t('기본 정보', 'Basic information')}</h2><p>{t('설정 변경은 그룹 팀장만 할 수 있습니다.', 'Only group leaders can change settings.')}</p></header>
       <dl><div><dt>{t('설명', 'Description')}</dt><dd>{group?.description || t('설명 없음', 'No description')}</dd></div><div><dt>{t('시간대', 'Time zone')}</dt><dd>{group?.timezone}</dd></div><div><dt>{t('대시보드', 'Dashboard')}</dt><dd>{group?.dashboardVisibility === 'MEMBERS' ? t('모든 멤버', 'All members') : t('팀장만', 'Leaders only')}</dd></div></dl>
     </section>)}
-    {group?.type === 'TEAM' && settingsTab === 'plan' && <section className={`settings-tab-panel group-subsection membership-section ${group.membershipPlan.toLowerCase()}`}><header className="group-section-heading"><div><span className="page-eyebrow">PLAN</span><h2>{t('그룹 멤버십', 'Group membership')}</h2><p>{t('기본 리포트는 모든 그룹에서 제한 없이 사용할 수 있습니다.', 'Core reports are unlimited for every group.')}</p></div><span className={`membership-badge ${group.membershipPlan.toLowerCase()}`}>{group.membershipPlan === 'PAID' ? t('유료 테스트', 'Paid test') : t('무료', 'Free')}</span></header>
-      <div className="membership-plan-layout"><div className="membership-benefits"><strong>{group.membershipPlan === 'PAID' ? t('유료 그룹 테스트 이용 중', 'Paid group test active') : t('무료 그룹', 'Free group')}</strong><ul>
+    {group?.type === 'TEAM' && settingsTab === 'plan' && <section className={`settings-tab-panel group-subsection membership-section ${group.membershipPlan.toLowerCase()}`}><header className="group-section-heading"><div><span className="page-eyebrow">PLAN</span><h2>{t('그룹 멤버십', 'Group membership')}</h2><p>{t('기본 리포트는 모든 그룹에서 제한 없이 사용할 수 있습니다.', 'Core reports are unlimited for every group.')}</p></div><span className={`membership-badge ${group.membershipPlan.toLowerCase()}`}>{group.membershipPlan === 'PAID' ? t('유료 멤버십', 'Paid membership') : t('무료', 'Free')}</span></header>
+      <div className="membership-plan-layout"><div className="membership-benefits"><strong>{group.membershipPlan === 'PAID' ? t('유료 그룹 이용 중', 'Paid group active') : t('무료 그룹', 'Free group')}</strong><ul>
         <li>{t('주간·월간·연간, 내 업무·그룹 전체 PDF 리포트 제한 없음', 'Unlimited weekly, monthly, and yearly personal/group PDF reports')}</li>
         <li>{t('업무·캘린더·댓글·멘션·알림의 전체 협업 흐름', 'Complete tasks, calendar, comments, mentions, and alerts')}</li>
-        <li>{group.membershipPlan === 'PAID' ? t('향후 OpenAI 분석·자동 메일 리포트 연결 대상', 'Ready for future OpenAI analysis and scheduled email reports') : t('AI 분석·자동 메일 리포트는 유료 기능으로 연결 예정', 'AI analysis and scheduled email reports are planned paid features')}</li>
-      </ul><small>{t('현재 유료 전환은 결제 없는 QA용 상태 변경입니다. 카드 등록이나 실제 청구가 발생하지 않습니다.', 'The current paid switch is QA-only. It does not register a card or create a real charge.')}</small></div>
-      <aside className="membership-period">{group.membershipPlan === 'PAID' ? <dl><div><dt>{t('테스트 시작일', 'Test started')}</dt><dd>{group.paidStartedAt ? formatDate(group.paidStartedAt, language) : '-'}</dd></div><div><dt>{t('이용 기간', 'Access period')}</dt><dd>{group.paidUntil ? t(`${formatDate(group.paidUntil, language)}까지`, `Until ${formatDate(group.paidUntil, language)}`) : '-'}</dd></div><div><dt>{t('다음 결제 예정일', 'Next billing date')}</dt><dd>{group.nextBillingAt ? formatDate(group.nextBillingAt, language) : '-'}</dd></div></dl> : <p>{t('필요할 때 테스트 유료 플랜으로 전환해 기간과 결제 예정일 표시를 검증할 수 있습니다.', 'Switch to the paid test plan to verify period and billing-date presentation.')}</p>}
+        <li>{group.membershipPlan === 'PAID' ? t('AI 업무 비서·AI 분석·자동 메일 리포트 활성화', 'AI assistant, AI analysis, and scheduled email reports enabled') : t('AI 비서·분석·자동 메일 리포트는 유료 멤버십 기능', 'AI assistant, analysis, and scheduled email reports require paid membership')}</li>
+      </ul></div>
+      <aside className="membership-period">{group.membershipPlan === 'PAID' ? <dl><div><dt>{t('이용 시작일', 'Started')}</dt><dd>{group.paidStartedAt ? formatDate(group.paidStartedAt, language) : '-'}</dd></div><div><dt>{t('이용 기간', 'Access period')}</dt><dd>{group.paidUntil ? t(`${formatDate(group.paidUntil, language)}까지`, `Until ${formatDate(group.paidUntil, language)}`) : '-'}</dd></div><div><dt>{t('다음 결제 예정일', 'Next billing date')}</dt><dd>{group.nextBillingAt ? formatDate(group.nextBillingAt, language) : t('자동 갱신 없음', 'No auto-renewal')}</dd></div></dl> : <p>{t('멤버십 결제 승인 후 AI 비서와 유료 기능이 즉시 활성화됩니다.', 'The AI assistant and paid features activate immediately after payment approval.')}</p>}
         {group.role === 'LEADER' && group.testPlanSwitchEnabled && <button className={group.membershipPlan === 'PAID' ? 'secondary' : 'primary'} type="button" disabled={planPending} onClick={() => switchTestPlan(group.membershipPlan === 'PAID' ? 'FREE' : 'PAID')}>{planPending ? t('전환 중...', 'Switching...') : group.membershipPlan === 'PAID' ? t('무료로 되돌리기', 'Return to free') : t('결제 없이 유료 그룹 체험', 'Try paid group without payment')}</button>}
-        {group.role === 'LEADER' && <Link className="membership-payment-link" to="/payments">{t('토스페이먼츠 결제 연동 테스트 확인', 'Open Toss Payments integration tests')} →</Link>}
+        {group.role === 'LEADER' && <Link className="membership-payment-link" to="/payments">{t('결제수단·결제 내역 관리', 'Manage payment methods and history')} →</Link>}
         {!group.testPlanSwitchEnabled && group.role === 'LEADER' && <small>{t('실제 서비스 환경에서는 결제 승인 완료 후에만 유료로 전환됩니다.', 'In production, paid status changes only after payment approval.')}</small>}
       </aside></div>
     </section>}

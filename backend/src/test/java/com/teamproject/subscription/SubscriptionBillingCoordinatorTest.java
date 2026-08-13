@@ -36,7 +36,7 @@ class SubscriptionBillingCoordinatorTest {
                 LocalDateTime.of(2026, 8, 1, 0, 0), ChargeKind.ACTIVATION);
         when(toss.configured()).thenReturn(true);
         when(cipher.configured()).thenReturn(true);
-        when(cipher.decrypt("encrypted")).thenReturn("billing-key");
+        lenient().when(cipher.decrypt("encrypted")).thenReturn("billing-key");
     }
 
     @Test
@@ -44,7 +44,7 @@ class SubscriptionBillingCoordinatorTest {
         LocalDateTime now = LocalDateTime.of(2026, 8, 7, 12, 0);
         when(transactions.prepareActivation(3L, 2L, 4L, 9900L,
                 "terms", "refund", "127.0.0.1", "test", now)).thenReturn(charge);
-        when(toss.charge("billing-key", "customer", 9900L, "order", "퇴근 팀 구독", "idempotency"))
+        when(toss.charge("billing-key", "customer", 9900L, "order", "Gearvia 팀 구독", "idempotency"))
                 .thenReturn(new TossPaymentsClient.ApiResult(200, new ObjectMapper().createObjectNode(), null, null));
 
         coordinator.activate(3L, 2L, 4L, 9900L, "terms", "refund", "127.0.0.1", "test", now);
@@ -52,7 +52,7 @@ class SubscriptionBillingCoordinatorTest {
         var ordered = inOrder(transactions, toss);
         ordered.verify(transactions).prepareActivation(3L, 2L, 4L, 9900L,
                 "terms", "refund", "127.0.0.1", "test", now);
-        ordered.verify(toss).charge("billing-key", "customer", 9900L, "order", "퇴근 팀 구독", "idempotency");
+        ordered.verify(toss).charge("billing-key", "customer", 9900L, "order", "Gearvia 팀 구독", "idempotency");
         ordered.verify(transactions).completeActivation(charge, now, 200, null);
         verify(transactions, never()).recordFailure(any(), any(), any(), any(), anyBoolean(), any());
     }
@@ -75,4 +75,5 @@ class SubscriptionBillingCoordinatorTest {
         verify(transactions).recordFailure(charge, null, "TOSS_NETWORK_ERROR", "network error", true, now);
         verify(transactions, never()).completeActivation(any(), any(), anyInt(), any());
     }
+
 }

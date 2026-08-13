@@ -1,4 +1,4 @@
-const CACHE_NAME = 'toegeun-shell-v9';
+const CACHE_NAME = 'gearvia-shell-v10';
 const APP_SHELL = ['/app', '/manifest.webmanifest', '/icons/app-icon.svg', '/icons/app-icon-192.png', '/icons/app-icon-512.png', '/icons/app-icon-maskable-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -21,11 +21,11 @@ self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data?.json() ?? {}; } catch { data = { body: event.data?.text() ?? '' }; }
   const target = typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/notifications';
-  event.waitUntil(self.registration.showNotification(data.title || '퇴근', {
+  event.waitUntil(self.registration.showNotification(data.title || 'Gearvia', {
     body: data.body || '새 알림이 도착했습니다.',
     icon: '/icons/app-icon-192.png',
     badge: '/icons/app-icon-192.png',
-    tag: data.tag || 'toegeun-notification',
+    tag: data.tag || 'gearvia-notification',
     data: { url: target },
     silent: true,
     requireInteraction: true,

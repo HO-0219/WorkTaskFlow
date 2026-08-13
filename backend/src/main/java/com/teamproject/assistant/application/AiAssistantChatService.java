@@ -41,10 +41,12 @@ public class AiAssistantChatService {
     private final ObjectMapper objectMapper;
     private final AiAssistantMessageStore messages;
     private final AiDocumentSearchService documents;
+    private final AiAssistantEntitlementService entitlement;
 
     public AiAssistantChatService(AiAssistantContextService contexts, AiAssistantGateway gateway,
             AiAssistantActionRepository actions, UserRepository users, ObjectMapper objectMapper,
-            AiAssistantMessageStore messages, AiDocumentSearchService documents) {
+            AiAssistantMessageStore messages, AiDocumentSearchService documents,
+            AiAssistantEntitlementService entitlement) {
         this.contexts = contexts;
         this.gateway = gateway;
         this.actions = actions;
@@ -52,9 +54,11 @@ public class AiAssistantChatService {
         this.objectMapper = objectMapper;
         this.messages = messages;
         this.documents = documents;
+        this.entitlement = entitlement;
     }
 
     public ChatResponse chat(Long userId, ChatRequest request) {
+        entitlement.require(userId, request.groupId());
         var context = contexts.load(userId, request.groupId());
         var history = messages.modelContext(userId, request.groupId());
         messages.append(userId, context.group(), AiAssistantMessage.Role.USER, request.message(), null);

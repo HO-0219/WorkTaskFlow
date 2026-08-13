@@ -51,16 +51,25 @@ public class ProductionConfigurationValidator {
         require("spring.security.oauth2.client.registration.google.client-secret",
                 value -> !value.isBlank() && !value.equalsIgnoreCase("disabled"), failures,
                 "OAUTH2_GOOGLE_CLIENT_SECRET is required");
-        require("app.toss.test-mode", Boolean::parseBoolean, failures,
-                "TOSS_TEST_MODE must remain true");
-        require("app.subscription.live-billing-enabled", value -> !Boolean.parseBoolean(value), failures,
-                "SUBSCRIPTION_LIVE_BILLING_ENABLED must remain false");
-        require("app.toss.client-key",
-                value -> value.startsWith("test_ck_") || value.startsWith("test_gck_"), failures,
-                "TOSS_CLIENT_KEY must be an official test key");
-        require("app.toss.secret-key",
-                value -> value.startsWith("test_sk_") || value.startsWith("test_gsk_"), failures,
-                "TOSS_SECRET_KEY must be an official test key");
+        boolean liveBilling = Boolean.parseBoolean(value("app.subscription.live-billing-enabled"));
+        boolean tossTestMode = Boolean.parseBoolean(value("app.toss.test-mode"));
+        if (liveBilling) {
+            if (tossTestMode) failures.add("TOSS_TEST_MODE must be false when live billing is enabled");
+            require("app.toss.client-key",
+                    value -> value.startsWith("live_ck_") || value.startsWith("live_gck_"), failures,
+                    "TOSS_CLIENT_KEY must be an official live key when live billing is enabled");
+            require("app.toss.secret-key",
+                    value -> value.startsWith("live_sk_") || value.startsWith("live_gsk_"), failures,
+                    "TOSS_SECRET_KEY must be an official live key when live billing is enabled");
+        } else {
+            if (!tossTestMode) failures.add("TOSS_TEST_MODE must remain true until live billing is enabled");
+            require("app.toss.client-key",
+                    value -> value.startsWith("test_ck_") || value.startsWith("test_gck_"), failures,
+                    "TOSS_CLIENT_KEY must be an official test key");
+            require("app.toss.secret-key",
+                    value -> value.startsWith("test_sk_") || value.startsWith("test_gsk_"), failures,
+                    "TOSS_SECRET_KEY must be an official test key");
+        }
         require("app.toss.encryption-key-base64", this::isExact32ByteBase64Key, failures,
                 "PAYMENT_ENCRYPTION_KEY_BASE64 must decode to exactly 32 bytes");
 

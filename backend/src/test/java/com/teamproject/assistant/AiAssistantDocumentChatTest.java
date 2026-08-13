@@ -17,6 +17,7 @@ import com.teamproject.resource.application.ResourceService;
 import com.teamproject.user.domain.User;
 import com.teamproject.user.domain.UserRepository;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -140,6 +141,7 @@ class AiAssistantDocumentChatTest {
         User user = users.save(new User("chat_" + suffix, "chat_" + suffix + "@example.com",
                 "hash", "문서 사용자", true));
         Group group = groups.save(Group.team("문서 테스트 그룹", null, "Asia/Seoul", user));
+        group.switchTestMembership(Group.MembershipPlan.PAID, LocalDateTime.now());
         members.save(GroupMember.leader(group, user));
         return new Fixture(user.getId(), group.getId());
     }
