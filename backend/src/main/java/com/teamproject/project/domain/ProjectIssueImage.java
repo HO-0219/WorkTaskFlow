@@ -17,7 +17,7 @@ public class ProjectIssueImage {
     @Column(nullable = false, length = 255) private String originalFilename;
     @Column(nullable = false, length = 100) private String contentType;
     @Column(nullable = false) private long sizeBytes;
-    @Column(nullable = false, length = 64) private String checksumSha256;
+    @Column(nullable = false, length = 64, columnDefinition = "char(64)") private String checksumSha256;
     @Column(nullable = false) private int sortOrder;
     @Column(nullable = false, updatable = false) private LocalDateTime createdAt;
 

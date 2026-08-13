@@ -1,7 +1,11 @@
 package com.teamproject.migration;
 
+import com.teamproject.TeamProjectApplication;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -105,6 +109,26 @@ class MySqlFlywayMigrationTest {
                 "chat_messages",
                 List.of("channel_id", "sender_member_id", "message_type", "storage_key", "size_bytes", "created_at")))
                 .isEqualTo(6);
+
+        // Flyway SQL이 성공하는 것만으로는 운영의 Hibernate validate 타입 불일치를 잡지 못한다.
+        // 실제 운영과 같은 MySQL 스키마 위에서 애플리케이션 컨텍스트까지 시작해 매핑을 검증한다.
+        try (ConfigurableApplicationContext ignored = new SpringApplicationBuilder(TeamProjectApplication.class)
+                .web(WebApplicationType.SERVLET)
+                .run(
+                        "--server.port=0",
+                        "--spring.datasource.url=" + MYSQL.getJdbcUrl(),
+                        "--spring.datasource.username=" + MYSQL.getUsername(),
+                        "--spring.datasource.password=" + MYSQL.getPassword(),
+                        "--spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
+                        "--spring.flyway.enabled=false",
+                        "--spring.jpa.hibernate.ddl-auto=validate",
+                        "--app.environment=test",
+                        "--app.demo.enabled=false",
+                        "--app.mail.enabled=false",
+                        "--app.ai-report.enabled=false",
+                        "--app.ai-assistant.enabled=false")) {
+            assertThat(ignored.isActive()).isTrue();
+        }
     }
 
     private long countColumns(String table, List<String> columns) throws Exception {

@@ -323,6 +323,26 @@ jobs:
           ssh "${ssh_options[@]}" "${EC2_USER}@${EC2_HOST}" 'bash -s' <<'REMOTE'
             set -euo pipefail
             cd /opt/totaskflow
+            deployment_exit() {
+              status=$?
+              trap - EXIT
+              if [[ "$status" -ne 0 ]]; then
+                echo "::error::Deployment failed. Capturing service status and backend logs."
+                sudo docker compose --env-file runtime.env.current -f compose.yml ps || true
+                sudo docker compose --env-file runtime.env.current -f compose.yml \
+                  logs --tail=250 backend web mysql || true
+                if [[ -f runtime.env.previous ]]; then
+                  echo "Attempting rollback to the previous release images."
+                  cp runtime.env.previous runtime.env.current
+                  sudo docker compose --env-file runtime.env.current -f compose.yml \
+                    up -d --remove-orphans || true
+                  sudo docker compose --env-file runtime.env.current -f compose.yml ps || true
+                fi
+              fi
+              sudo docker logout ghcr.io >/dev/null 2>&1 || true
+              exit "$status"
+            }
+            trap deployment_exit EXIT
             chmod 600 runtime.env deployment.env mysql-root-password
             if [[ -f runtime.env.current ]]; then
               cp runtime.env.current runtime.env.previous

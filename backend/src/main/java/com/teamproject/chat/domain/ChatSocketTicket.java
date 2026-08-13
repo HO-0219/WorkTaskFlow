@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public class ChatSocketTicket {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id") private User user;
-    @Column(nullable = false, length = 64, unique = true) private String tokenHash;
+    @Column(nullable = false, length = 64, unique = true, columnDefinition = "char(64)") private String tokenHash;
     @Column(nullable = false) private LocalDateTime expiresAt;
     private LocalDateTime consumedAt;
     @Column(nullable = false, updatable = false) private LocalDateTime createdAt;
