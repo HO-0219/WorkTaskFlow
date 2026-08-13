@@ -126,6 +126,18 @@ public class NotificationService {
     }
 
     @Transactional
+    public void chatMessage(GroupMember actor, Long channelId, Long messageId, String channelName) {
+        var recipients = members.findAllByGroupIdAndStatusOrderByRoleAscJoinedAtAsc(
+                actor.getGroup().getId(), GroupMember.Status.ACTIVE).stream()
+                .filter(member -> !member.getUser().getId().equals(actor.getUser().getId()))
+                .toList();
+        recipients.forEach(recipient -> insertAndPublish(new Notification(
+                recipient.getUser(), actor.getUser(), actor.getGroup(), null, null,
+                Notification.Type.CHAT_MESSAGE, "CHAT_MESSAGE:" + channelId + ":" + messageId,
+                "새 채팅 메시지", "'" + channelName + "' 채팅방에 새 메시지가 도착했습니다.")));
+    }
+
+    @Transactional
     public void newDeviceLogin(User user, String deviceName, String eventKey) {
         createSecurity(user, Notification.Type.SECURITY_NEW_DEVICE, eventKey,
                 "새 기기 로그인", deviceName + "에서 새 로그인이 확인되었습니다.");
@@ -223,12 +235,7 @@ public class NotificationService {
     }
 
     private void publish(Notification notification) {
-        String targetUrl = notification.getTask() != null ? "/tasks/" + notification.getTask().getId()
-                : notification.getType() == Notification.Type.SECURITY_NEW_DEVICE
-                        || notification.getType() == Notification.Type.SECURITY_SESSION_REUSED ? "/account"
-                : notification.getType() == Notification.Type.SUBSCRIPTION_ROLLOUT_NOTICE
-                        && notification.getGroup() != null ? "/groups/" + notification.getGroup().getId()
-                : "/notifications";
+        String targetUrl = targetUrl(notification);
         events.publishEvent(new PushNotificationEvent(
                 notification.getRecipient().getId(),
                 notification.getId(),
@@ -240,6 +247,18 @@ public class NotificationService {
                 "notification-" + notification.getId()));
     }
 
+    private String targetUrl(Notification notification) {
+        return notification.getTask() != null ? "/tasks/" + notification.getTask().getId()
+                : notification.getType() == Notification.Type.SECURITY_NEW_DEVICE
+                        || notification.getType() == Notification.Type.SECURITY_SESSION_REUSED ? "/account"
+                : notification.getType() == Notification.Type.SUBSCRIPTION_ROLLOUT_NOTICE
+                        && notification.getGroup() != null ? "/groups/" + notification.getGroup().getId()
+                : notification.getType() == Notification.Type.CHAT_MESSAGE
+                        && notification.getGroup() != null ? "/groups/" + notification.getGroup().getId()
+                                + "/chat?channel=" + notification.getEventKey().split(":")[1]
+                : "/notifications";
+    }
+
     private NotificationResponse response(Notification value) {
         return new NotificationResponse(value.getId(), value.getType().name(), value.getTitle(), value.getMessage(),
                 value.getActor() == null ? null : value.getActor().getId(),
@@ -248,7 +267,7 @@ public class NotificationService {
                 value.getGroup() == null ? null : value.getGroup().getName(),
                 value.getTask() == null ? null : value.getTask().getId(),
                 value.getComment() == null ? null : value.getComment().getId(),
-                value.getReadAt() != null, value.getReadAt(), value.getCreatedAt());
+                targetUrl(value), value.getReadAt() != null, value.getReadAt(), value.getCreatedAt());
     }
 
     private String statusLabel(Task.Status status) {

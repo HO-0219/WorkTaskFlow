@@ -102,6 +102,14 @@ class ChatApiTest {
                         .header("Authorization", "Bearer " + owner))
                 .andExpect(status().isOk()).andExpect(content().contentType("image/png"))
                 .andExpect(content().bytes(png));
+        mvc.perform(get("/api/v1/notifications").header("Authorization", "Bearer " + owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].type").value("CHAT_MESSAGE"))
+                .andExpect(jsonPath("$.items[0].actorNickname").value(memberUser.getNickname()))
+                .andExpect(jsonPath("$.items[0].targetUrl")
+                        .value("/groups/" + groupId + "/chat?channel=" + channelId));
+        mvc.perform(get("/api/v1/notifications").header("Authorization", "Bearer " + memberToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
     }
 
     @Test

@@ -10,6 +10,7 @@ import { BrandMark } from './BrandMark';
 const items = [
   { to: '/app', label: '홈', icon: '⌂' },
   { to: '/groups', label: '그룹', icon: '♧' },
+  { to: '/chat', label: '채팅', icon: '◌' },
   { to: '/calendar', label: '캘린더', icon: '□' },
   { to: '/notifications', label: '알림', icon: '♢' },
   { to: '/assistant', label: '비서', icon: '✦' },
@@ -43,8 +44,9 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
   useEffect(() => { if (unreadCount !== undefined) setLiveUnreadCount(unreadCount); }, [unreadCount]);
   const pathGroupId = pathname.match(/^\/groups\/(\d+)/)?.[1];
   const selectedGroupId = pathGroupId ?? new URLSearchParams(search).get('groupId') ?? '';
-  const labels = language === 'ko' ? ['홈', '그룹', '캘린더', '알림', '비서', '프로필'] : ['Home', 'Groups', 'Calendar', 'Alerts', 'Assistant', 'Profile'];
+  const labels = language === 'ko' ? ['홈', '그룹', '채팅', '캘린더', '알림', '비서', '프로필'] : ['Home', 'Groups', 'Chat', 'Calendar', 'Alerts', 'Assistant', 'Profile'];
   const teamGroups = groups.filter((group) => group.type === 'TEAM');
+  const selectedTeamGroup = teamGroups.find((group) => String(group.id) === selectedGroupId);
   const demo = sessionMode.isDemo();
   async function exitDemo() {
     await authApi.logout().catch(() => undefined);
@@ -61,8 +63,12 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
       navigate(group.type === 'PERSONAL' ? `/calendar?groupId=${group.id}` : `/groups/${group.id}/dashboard`);
     }}><option value="">{language === 'ko' ? '전체 그룹 보기' : 'View all groups'}</option><optgroup label={language === 'ko' ? '개인 일정' : 'Personal schedule'}>{groups.filter((group) => group.type === 'PERSONAL').map((group) => <option value={group.id} key={group.id}>● {group.name}</option>)}</optgroup><optgroup label={language === 'ko' ? '팀 그룹' : 'Teams'}>{teamGroups.map((group) => <option value={group.id} key={group.id}>◆ {group.name}</option>)}</optgroup></select><small>{language === 'ko' ? '목록을 열어 다른 그룹으로 바로 이동하세요.' : 'Open the list to move directly to another group.'}</small></label>}
     <div className="app-navigation-items">{items.map((item, index) => {
-      const active = item.to === '/app' ? pathname === '/app' : pathname.startsWith(item.to);
-      return <Link className={active ? 'active' : ''} to={item.to} key={item.to} aria-current={active ? 'page' : undefined}>
+      const destination = item.to === '/chat'
+        ? (selectedTeamGroup ?? teamGroups[0]) ? `/groups/${(selectedTeamGroup ?? teamGroups[0]).id}/chat` : '/groups'
+        : item.to;
+      const active = item.to === '/app' ? pathname === '/app'
+        : item.to === '/chat' ? /^\/groups\/\d+\/chat$/.test(pathname) : pathname.startsWith(item.to);
+      return <Link className={active ? 'active' : ''} to={destination} key={item.to} aria-current={active ? 'page' : undefined}>
         <span className="app-navigation-icon" aria-hidden="true">{item.icon}</span>
         <span>{labels[index]}</span>
         {item.to === '/notifications' && liveUnreadCount > 0 && <b>{liveUnreadCount > 99 ? '99+' : liveUnreadCount}</b>}

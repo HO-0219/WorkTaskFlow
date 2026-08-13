@@ -6,6 +6,7 @@ import com.teamproject.common.exception.ApplicationException;
 import com.teamproject.common.storage.GroupStorageQuotaService;
 import com.teamproject.group.application.*;
 import com.teamproject.group.domain.*;
+import com.teamproject.notification.application.NotificationService;
 import com.teamproject.project.domain.*;
 import com.teamproject.resource.storage.FileStorage;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,14 +40,15 @@ public class ChatService {
     private final FileStorage storage;
     private final ChatRateLimiter rateLimiter;
     private final ApplicationEventPublisher events;
+    private final NotificationService notifications;
 
     public ChatService(ChatChannelRepository channels, ChatMessageRepository messages,
             GroupAuthorization authorization, GroupRepository groups, GroupFeaturePolicy features, ProjectRepository projects,
             ProjectIssueRepository issues, GroupStorageQuotaService quota, FileStorage storage,
-            ChatRateLimiter rateLimiter, ApplicationEventPublisher events) {
+            ChatRateLimiter rateLimiter, ApplicationEventPublisher events, NotificationService notifications) {
         this.channels = channels; this.messages = messages; this.authorization = authorization;
         this.groups = groups; this.features = features; this.projects = projects; this.issues = issues; this.quota = quota;
-        this.storage = storage; this.rateLimiter = rateLimiter; this.events = events;
+        this.storage = storage; this.rateLimiter = rateLimiter; this.events = events; this.notifications = notifications;
     }
 
     @Transactional
@@ -94,6 +96,7 @@ public class ChatService {
         if (content.isBlank() || content.length() > 4000) throw new ApplicationException(
                 "CHAT_MESSAGE_INVALID", HttpStatus.BAD_REQUEST, "1~4000자의 메시지를 입력해 주세요.");
         ChatMessage saved = messages.saveAndFlush(ChatMessage.text(access.channel(), access.member(), content));
+        notifications.chatMessage(access.member(), channelId, saved.getId(), access.channel().getName());
         MessageResponse response = messageResponse(saved); events.publishEvent(new ChatMessageEvent(channelId, response));
         return response;
     }
@@ -114,6 +117,7 @@ public class ChatService {
         ChatMessage.Type type = value.image() ? ChatMessage.Type.IMAGE : ChatMessage.Type.FILE;
         ChatMessage saved = messages.saveAndFlush(ChatMessage.attachment(access.channel(), access.member(), type,
                 cleanCaption, key, filename, value.contentType(), value.bytes().length, sha256(value.bytes())));
+        notifications.chatMessage(access.member(), channelId, saved.getId(), access.channel().getName());
         MessageResponse response = messageResponse(saved); events.publishEvent(new ChatMessageEvent(channelId, response));
         return response;
     }

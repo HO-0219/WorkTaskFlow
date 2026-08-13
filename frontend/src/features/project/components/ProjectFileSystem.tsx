@@ -65,10 +65,22 @@ export function ProjectFileSystem({ project, nodes }: { project: ProjectResponse
       <p className="modal-location">📁 {selected?.title ?? project.name}</p>
       <label className="field"><span>{t('자료 제목', 'Title')}</span><input required={mode === 'LINK'} maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={mode === 'FILE' ? t('비우면 파일명을 사용합니다.', 'Uses filename when empty.') : ''} /></label>
       {mode === 'LINK' ? <label className="field"><span>HTTPS URL</span><input required type="url" maxLength={1000} value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://" /></label>
-        : <label className="field"><span>{t('파일', 'File')}</span><input required type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.txt,.csv,.docx,.xlsx,.pptx,.zip" onChange={(event) => setFile(event.target.files?.[0])} /><small>{t('무료 20MB · 유료 100MB/파일', 'Free 20MB · Paid 100MB/file')}</small></label>}
+        : <label className={`field project-upload-picker ${file ? 'selected' : ''}`}><span>{t('파일', 'File')}</span><input required type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.txt,.csv,.docx,.xlsx,.pptx,.zip" onChange={(event) => setFile(event.target.files?.[0])} />{file && <ProjectUploadSelection file={file} />}<small>{t('무료 20MB · 유료 100MB/파일', 'Free 20MB · Paid 100MB/file')}</small></label>}
       <div className="modal-actions"><button className="secondary" type="button" onClick={() => setMode(undefined)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving || mode === 'FILE' && !file}>{saving ? t('저장 중...', 'Saving...') : t('저장', 'Save')}</button></div>
     </form></Modal>}
   </section>;
+}
+
+function ProjectUploadSelection({ file }: { file: File }) {
+  const { t } = useLanguage();
+  const [previewUrl, setPreviewUrl] = useState('');
+  const image = file.type.startsWith('image/') && /\.(png|jpe?g|gif)$/i.test(file.name);
+  useEffect(() => {
+    if (!image) { setPreviewUrl(''); return; }
+    const url = URL.createObjectURL(file); setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file, image]);
+  return <div className="project-upload-selection">{previewUrl ? <img src={previewUrl} alt="" /> : <b aria-hidden="true">▤</b>}<span><strong>{file.name}</strong><small>{formatBytes(file.size)} · {t('선택됨', 'Selected')}</small></span></div>;
 }
 
 function FolderBranch({ node, childrenMap, selectedId, onSelect }: {
