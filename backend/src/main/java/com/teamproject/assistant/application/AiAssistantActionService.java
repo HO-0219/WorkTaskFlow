@@ -116,7 +116,8 @@ public class AiAssistantActionService {
                 ? null : LocalDateTime.parse(args.dueAt());
         List<String> items = validatedItems(args.checklistItems());
         var task = tasks.create(userId, action.getGroup().getId(),
-                new CreateTaskRequest(title, description, priority, dueAt, items));
+                new CreateTaskRequest(title, description, priority, dueAt,
+                        args.projectId(), args.projectTopicId(), items));
         return new ActionResponse(action.getId(), "COMPLETED",
                 "'" + task.title() + "' 업무를 만들었습니다.", "/tasks/" + task.id(), null, null);
     }
@@ -229,7 +230,7 @@ public class AiAssistantActionService {
     }
 
     private record CreateTaskArgs(String title, String description, String priority,
-            String dueAt, List<String> checklistItems) {}
+            String dueAt, Long projectId, Long projectTopicId, List<String> checklistItems) {}
     private record TaskIdArgs(Long taskId) {}
     private record ChecklistArgs(Long taskId, List<String> items) {}
     private record GroupIdArgs(Long groupId) {}

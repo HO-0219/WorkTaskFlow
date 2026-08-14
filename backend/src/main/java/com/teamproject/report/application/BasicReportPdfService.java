@@ -46,7 +46,7 @@ public class BasicReportPdfService {
         }
 
         List<BasicReportTask> rows = tasks.stream().map(task -> new BasicReportTask(
-                task.title(),
+                contextualTitle(task),
                 task.status(),
                 task.priority(),
                 task.assigneeNickname(),
@@ -81,5 +81,12 @@ public class BasicReportPdfService {
 
     private String text(String language, String ko, String en) {
         return "ko".equals(language) ? ko : en;
+    }
+
+    private String contextualTitle(DashboardTaskResponse task) {
+        if (task.projectName() == null) return task.title();
+        String context = task.projectTopicTitle() == null ? task.projectName()
+                : task.projectName() + " · " + task.projectTopicTitle();
+        return "[" + context + "] " + task.title();
     }
 }

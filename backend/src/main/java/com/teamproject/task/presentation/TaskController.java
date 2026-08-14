@@ -43,6 +43,13 @@ public class TaskController {
         return tasks.update((Long) authentication.getPrincipal(), taskId, request);
     }
 
+    @DeleteMapping("/tasks/{taskId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(Authentication authentication, @PathVariable Long taskId,
+            @RequestParam long expectedVersion) {
+        tasks.delete((Long) authentication.getPrincipal(), taskId, expectedVersion);
+    }
+
     @PostMapping("/tasks/{taskId}/transitions")
     TaskResponse transition(Authentication authentication, @PathVariable Long taskId,
             @Valid @RequestBody TransitionTaskRequest request) {

@@ -12,6 +12,10 @@ import com.teamproject.task.application.dto.TaskDtos.TransitionTaskRequest;
 import com.teamproject.task.application.dto.TaskDtos.UpdateTaskRequest;
 import com.teamproject.group.domain.Group;
 import com.teamproject.notification.application.NotificationService;
+import com.teamproject.project.domain.Project;
+import com.teamproject.project.domain.ProjectIssue;
+import com.teamproject.project.domain.ProjectIssueRepository;
+import com.teamproject.project.domain.ProjectRepository;
 import com.teamproject.task.domain.Task;
 import com.teamproject.task.domain.TaskChecklistItem;
 import com.teamproject.task.domain.TaskChecklistItemRepository;
@@ -36,25 +40,33 @@ public class TaskService {
     private final TaskChecklistItemRepository checklistItems;
     private final NotificationService notifications;
     private final TaskActivityRecorder activity;
+    private final ProjectRepository projects;
+    private final ProjectIssueRepository projectIssues;
     private final Clock clock;
 
     public TaskService(GroupAuthorization authorization, TaskRepository tasks,
             TaskStatusHistoryRepository histories, TaskChecklistItemRepository checklistItems,
-            NotificationService notifications, TaskActivityRecorder activity, Clock clock) {
+            NotificationService notifications, TaskActivityRecorder activity,
+            ProjectRepository projects, ProjectIssueRepository projectIssues, Clock clock) {
         this.authorization = authorization;
         this.tasks = tasks;
         this.histories = histories;
         this.checklistItems = checklistItems;
         this.notifications = notifications;
         this.activity = activity;
+        this.projects = projects;
+        this.projectIssues = projectIssues;
         this.clock = clock;
     }
 
     @Transactional
     public TaskResponse create(Long userId, Long groupId, CreateTaskRequest request) {
         GroupMember requester = authorization.requireActiveMember(groupId, userId);
-        Task task = tasks.save(new Task(requester.getGroup(), requester, request.title().trim(),
-                blankToNull(request.description()), priority(request.priority()), request.dueAt()));
+        ProjectLink link = projectLink(groupId, request.projectId(), request.projectTopicId());
+        Task task = new Task(requester.getGroup(), requester, request.title().trim(),
+                blankToNull(request.description()), priority(request.priority()), request.dueAt());
+        task.linkProject(link.project(), link.topic());
+        task = tasks.save(task);
         histories.save(new TaskStatusHistory(task, null, task.getStatus(), requester, null));
         // 등록 시점의 체크리스트까지 저장한 뒤에 기록해야 활동 이벤트의 항목 수가 맞는다.
         createChecklist(task, request.checklistItems());
@@ -71,7 +83,7 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public TaskResponse get(Long userId, Long taskId) {
-        Task task = tasks.findById(taskId).orElseThrow(() -> notFound());
+        Task task = task(taskId);
         authorization.requireActiveMember(task.getGroup().getId(), userId);
         return response(task);
     }
@@ -188,9 +200,38 @@ public class TaskService {
         LocalDateTime dueAt = Boolean.TRUE.equals(request.clearDueAt())
                 ? null : request.dueAt() == null ? task.getDueAt() : request.dueAt();
         task.updateDetails(title, description, priority, dueAt);
+        if (Boolean.TRUE.equals(request.clearProjectLink())) {
+            task.linkProject(null, null);
+        } else if (request.projectId() != null || request.projectTopicId() != null) {
+            Long projectId = request.projectId() == null && task.getProject() != null
+                    ? task.getProject().getId() : request.projectId();
+            ProjectLink link = projectLink(task.getGroup().getId(), projectId, request.projectTopicId());
+            task.linkProject(link.project(), link.topic());
+        }
         tasks.flush();
         activity.record(task, actor, TaskActivityEvent.Type.DETAILS_CHANGED);
         return response(task);
+    }
+
+    @Transactional
+    public void delete(Long userId, Long taskId, long expectedVersion) {
+        Task task = task(taskId);
+        GroupMember actor = authorization.requireActiveMember(task.getGroup().getId(), userId);
+        requireVersion(task, expectedVersion);
+        if (task.getStatus() != Task.Status.COMPLETED) {
+            throw new ApplicationException("TASK_DELETE_STATE_INVALID", HttpStatus.CONFLICT,
+                    "완료된 업무만 삭제할 수 있습니다.");
+        }
+        boolean personalOwner = task.getGroup().getType() == Group.Type.PERSONAL
+                && task.getRequester().getId().equals(actor.getId());
+        boolean teamLeader = task.getGroup().getType() == Group.Type.TEAM
+                && actor.getRole() == GroupMember.Role.LEADER;
+        if (!personalOwner && !teamLeader) {
+            throw new ApplicationException("TASK_DELETE_FORBIDDEN", HttpStatus.FORBIDDEN,
+                    "완료 업무를 삭제할 권한이 없습니다.");
+        }
+        task.delete();
+        tasks.flush();
     }
 
     @Transactional(readOnly = true)
@@ -229,7 +270,11 @@ public class TaskService {
     private ApplicationException notFound() {
         return new ApplicationException("TASK_NOT_FOUND", HttpStatus.NOT_FOUND, "업무를 찾을 수 없습니다.");
     }
-    private Task task(Long taskId) { return tasks.findById(taskId).orElseThrow(this::notFound); }
+    private Task task(Long taskId) {
+        Task task = tasks.findById(taskId).orElseThrow(this::notFound);
+        if (task.getDeletedAt() != null) throw notFound();
+        return task;
+    }
     private void requireVersion(Task task, Long expectedVersion) {
         if (task.getVersion() != expectedVersion) {
             throw new ApplicationException("TASK_VERSION_CONFLICT", HttpStatus.CONFLICT,
@@ -265,21 +310,45 @@ public class TaskService {
     }
     private void requireEditable(Task task, GroupMember actor) {
         if (task.getGroup().getType() == Group.Type.PERSONAL) {
-            if (isTerminal(task.getStatus())) {
+            if (task.getStatus() == Task.Status.REJECTED || task.getStatus() == Task.Status.CANCELLED) {
                 throw new ApplicationException("TASK_EDIT_STATE_INVALID", HttpStatus.CONFLICT,
-                        "종료된 개인 업무는 수정할 수 없습니다.");
+                        "반려되거나 취소된 업무는 수정할 수 없습니다.");
             }
             return;
         }
-        if (task.getStatus() != Task.Status.REQUESTED) {
+        if (task.getStatus() == Task.Status.REJECTED || task.getStatus() == Task.Status.CANCELLED) {
             throw new ApplicationException("TASK_EDIT_STATE_INVALID", HttpStatus.CONFLICT,
-                    "승인 대기 중인 업무만 내용을 수정할 수 있습니다.");
+                    "반려되거나 취소된 업무는 수정할 수 없습니다.");
         }
         boolean requester = task.getRequester().getId().equals(actor.getId());
-        if (!requester && actor.getRole() != GroupMember.Role.LEADER) {
+        boolean assignee = task.getAssignee() != null && task.getAssignee().getId().equals(actor.getId());
+        if (!requester && !assignee && actor.getRole() != GroupMember.Role.LEADER) {
             throw new ApplicationException("TASK_EDIT_FORBIDDEN", HttpStatus.FORBIDDEN,
-                    "업무 요청자 또는 그룹 팀장만 수정할 수 있습니다.");
+                    "업무 요청자, 담당자 또는 그룹 팀장만 수정할 수 있습니다.");
         }
+    }
+
+    private ProjectLink projectLink(Long groupId, Long projectId, Long topicId) {
+        if (projectId == null) {
+            if (topicId != null) throw invalidProjectLink();
+            return new ProjectLink(null, null);
+        }
+        Project project = projects.findById(projectId).orElseThrow(this::invalidProjectLink);
+        if (!project.getGroup().getId().equals(groupId) || project.getStatus() == Project.Status.ARCHIVED) {
+            throw invalidProjectLink();
+        }
+        if (topicId == null) return new ProjectLink(project, null);
+        ProjectIssue topic = projectIssues.findByIdAndArchivedAtIsNull(topicId)
+                .orElseThrow(this::invalidProjectLink);
+        if (!topic.getProject().getId().equals(projectId) || topic.getLevel() != ProjectIssue.Level.MAJOR) {
+            throw invalidProjectLink();
+        }
+        return new ProjectLink(project, topic);
+    }
+
+    private ApplicationException invalidProjectLink() {
+        return new ApplicationException("TASK_PROJECT_LINK_INVALID", HttpStatus.BAD_REQUEST,
+                "같은 그룹의 활성 프로젝트와 주제를 선택해 주세요.");
     }
     private String requireTitle(String value) {
         if (value.isBlank()) {
@@ -343,7 +412,12 @@ public class TaskService {
                 "현재 상태에서는 요청한 업무 상태 변경을 할 수 없습니다.");
     }
     private TaskResponse response(Task task) {
-        return new TaskResponse(task.getId(), task.getGroup().getId(), task.getRequester().getId(),
+        return new TaskResponse(task.getId(), task.getGroup().getId(),
+                task.getProject() == null ? null : task.getProject().getId(),
+                task.getProject() == null ? null : task.getProject().getName(),
+                task.getProjectTopic() == null ? null : task.getProjectTopic().getId(),
+                task.getProjectTopic() == null ? null : task.getProjectTopic().getTitle(),
+                task.getRequester().getId(),
                 task.getApprover() == null ? null : task.getApprover().getId(),
                 task.getAssignee() == null ? null : task.getAssignee().getId(), task.getTitle(),
                 task.getDescription(), task.getPriority().name(), task.getStatus().name(),
@@ -355,4 +429,6 @@ public class TaskService {
                 task.getBlockerReviewDate(), task.getStopReason(),
                 task.isDelayed(LocalDateTime.now()), task.getVersion(), task.getCreatedAt(), task.getUpdatedAt());
     }
+
+    private record ProjectLink(Project project, ProjectIssue topic) {}
 }

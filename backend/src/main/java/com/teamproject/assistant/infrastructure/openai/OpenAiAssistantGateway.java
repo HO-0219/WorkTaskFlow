@@ -24,6 +24,8 @@ public class OpenAiAssistantGateway implements AiAssistantGateway {
             사용자가 단순 조회나 설명을 요청하면 한국어로 간결하게 답한다.
             도구 인자의 taskId는 CURRENT_CONTEXT에 실제로 있는 값만 사용한다.
             groupId와 memberId도 CURRENT_CONTEXT에 실제로 있는 값만 사용한다.
+            팀 업무를 만들 때 사용자가 프로젝트나 주제를 언급했다면 CURRENT_CONTEXT의 projects에서 일치하는
+            projectId와 projectTopicId를 함께 전달한다. 어느 프로젝트인지 모호하면 짧게 확인 질문을 한다.
             현재 역할로 실행할 수 없거나 지원하지 않는 변경 요청에는 정확히 "승인되지 않은 내용입니다."라고만 답한다.
             """;
 
@@ -58,8 +60,10 @@ public class OpenAiAssistantGateway implements AiAssistantGateway {
                                 "description", nullableString(),
                                 "priority", enumValue("LOW", "NORMAL", "HIGH", "URGENT"),
                                 "dueAt", nullableString(),
+                                "projectId", nullableInteger(),
+                                "projectTopicId", nullableInteger(),
                                 "checklistItems", nullableStringArray()),
-                        List.of("title", "description", "priority", "dueAt", "checklistItems")))
+                        List.of("title", "description", "priority", "dueAt", "projectId", "projectTopicId", "checklistItems")))
                 .addTool(tool("create_group_invite_link", "선택한 팀 그룹의 새 초대 링크를 만든다.",
                         Map.of(), List.of()))
                 .addTool(tool("approve_task", "승인 대기(REQUESTED) 업무를 승인한다.",
@@ -128,6 +132,7 @@ public class OpenAiAssistantGateway implements AiAssistantGateway {
     private Map<String, Object> string() { return Map.of("type", "string"); }
     private Map<String, Object> nullableString() { return Map.of("type", List.of("string", "null")); }
     private Map<String, Object> integer() { return Map.of("type", "integer", "minimum", 1); }
+    private Map<String, Object> nullableInteger() { return Map.of("type", List.of("integer", "null"), "minimum", 1); }
     private Map<String, Object> enumValue(String... values) {
         return Map.of("type", "string", "enum", List.of(values));
     }

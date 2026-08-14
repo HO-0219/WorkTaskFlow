@@ -8,6 +8,10 @@ export type BlockerNextActionType = 'FOLLOW_UP' | 'ESCALATE' | 'DECIDE' | 'UNBLO
 export type TaskResponse = {
   id: number;
   groupId: number;
+  projectId?: number;
+  projectName?: string;
+  projectTopicId?: number;
+  projectTopicTitle?: string;
   requesterMemberId: number;
   approverMemberId?: number;
   assigneeMemberId?: number;
@@ -65,6 +69,8 @@ export type CreateTaskRequest = {
   description?: string;
   priority: TaskPriority;
   dueAt?: string;
+  projectId?: number;
+  projectTopicId?: number;
   checklistItems?: string[];
 };
 
@@ -74,6 +80,9 @@ export type UpdateTaskRequest = {
   priority?: TaskPriority;
   dueAt?: string;
   clearDueAt?: boolean;
+  projectId?: number;
+  projectTopicId?: number;
+  clearProjectLink?: boolean;
   expectedVersion: number;
 };
 
@@ -106,6 +115,9 @@ export const taskApi = {
   get: (taskId: number) => request<TaskResponse>(`/tasks/${taskId}`, {}, true),
   update: (taskId: number, body: UpdateTaskRequest) => request<TaskResponse>(`/tasks/${taskId}`, {
     method: 'PATCH', body: JSON.stringify(body),
+  }, true),
+  delete: (taskId: number, expectedVersion: number) => request<void>(`/tasks/${taskId}?expectedVersion=${expectedVersion}`, {
+    method: 'DELETE',
   }, true),
   transition: (
     taskId: number,

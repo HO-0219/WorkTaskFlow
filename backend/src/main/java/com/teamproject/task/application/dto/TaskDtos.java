@@ -17,14 +17,22 @@ public final class TaskDtos {
             @Size(max = 5000) String description,
             String priority,
             LocalDateTime dueAt,
+            @Positive Long projectId,
+            @Positive Long projectTopicId,
             @Size(max = 30) List<@Size(max = 300) String> checklistItems) {
         public CreateTaskRequest(String title, String description, String priority, LocalDateTime dueAt) {
-            this(title, description, priority, dueAt, null);
+            this(title, description, priority, dueAt, null, null, null);
+        }
+        public CreateTaskRequest(String title, String description, String priority, LocalDateTime dueAt,
+                List<String> checklistItems) {
+            this(title, description, priority, dueAt, null, null, checklistItems);
         }
     }
 
     public record TaskResponse(
-            Long id, Long groupId, Long requesterMemberId, Long approverMemberId, Long assigneeMemberId,
+            Long id, Long groupId, Long projectId, String projectName,
+            Long projectTopicId, String projectTopicTitle,
+            Long requesterMemberId, Long approverMemberId, Long assigneeMemberId,
             String title, String description, String priority, String status,
             LocalDateTime startAt, LocalDateTime dueAt, LocalDateTime completedAt,
             String holdReason, String blockerType, String blockerNextActionType,
@@ -56,7 +64,16 @@ public final class TaskDtos {
             String priority,
             LocalDateTime dueAt,
             Boolean clearDueAt,
-            @NotNull @PositiveOrZero Long expectedVersion) {}
+            @Positive Long projectId,
+            @Positive Long projectTopicId,
+            Boolean clearProjectLink,
+            @NotNull @PositiveOrZero Long expectedVersion) {
+        public UpdateTaskRequest(String title, String description, String priority,
+                LocalDateTime dueAt, Boolean clearDueAt, Long expectedVersion) {
+            this(title, description, priority, dueAt, clearDueAt,
+                    null, null, null, expectedVersion);
+        }
+    }
 
     public record TaskHistoryResponse(
             Long id, String fromStatus, String toStatus, Long changedByMemberId,

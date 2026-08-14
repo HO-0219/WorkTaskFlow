@@ -2,18 +2,28 @@ package com.teamproject.task.domain;
 
 import com.teamproject.group.domain.Group;
 import com.teamproject.group.domain.GroupMember;
+import com.teamproject.project.domain.Project;
+import com.teamproject.project.domain.ProjectIssue;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tasks")
+@SQLRestriction("deleted_at IS NULL")
 public class Task {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "group_id", nullable = false)
     private Group group;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id")
+    private Project project;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_topic_id")
+    private ProjectIssue projectTopic;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "requester_member_id", nullable = false)
     private GroupMember requester;
@@ -49,6 +59,7 @@ public class Task {
     private LocalDateTime createdAt;
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
     @Version
     private long version;
 
@@ -102,6 +113,14 @@ public class Task {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void linkProject(Project project, ProjectIssue projectTopic) {
+        this.project = project;
+        this.projectTopic = projectTopic;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void delete() { this.deletedAt = LocalDateTime.now(); this.updatedAt = deletedAt; }
+
     public void start() {
         if (startAt == null) startAt = LocalDateTime.now();
         changeStatus(Status.IN_PROGRESS);
@@ -149,6 +168,8 @@ public class Task {
     }
     public Long getId() { return id; }
     public Group getGroup() { return group; }
+    public Project getProject() { return project; }
+    public ProjectIssue getProjectTopic() { return projectTopic; }
     public GroupMember getRequester() { return requester; }
     public GroupMember getApprover() { return approver; }
     public GroupMember getAssignee() { return assignee; }
@@ -166,6 +187,7 @@ public class Task {
     public String getStopReason() { return stopReason; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
     public long getVersion() { return version; }
 
     public enum Priority { LOW, NORMAL, HIGH, URGENT }

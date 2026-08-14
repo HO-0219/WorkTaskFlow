@@ -9,6 +9,7 @@ import {
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
 import { ProjectFileSystem } from '../components/ProjectFileSystem';
+import { taskApi, TaskResponse } from '../../../api/taskApi';
 
 const statuses: Array<[IssueStatus, string, string]> = [
   ['OPEN', '대기', 'Open'], ['IN_PROGRESS', '진행 중', 'In progress'],
@@ -22,6 +23,7 @@ export function ProjectFlowPage() {
   const [project, setProject] = useState<ProjectResponse>();
   const [members, setMembers] = useState<MemberResponse[]>([]);
   const [nodes, setNodes] = useState<ProjectIssue[]>([]);
+  const [tasks, setTasks] = useState<TaskResponse[]>([]);
   const [editor, setEditor] = useState<Editor>();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -35,10 +37,11 @@ export function ProjectFlowPage() {
 
   const load = async () => {
     const projectValue = await projectApi.get(projectId);
-    const [memberValues, issueValues] = await Promise.all([
-      groupApi.members(projectValue.groupId), projectIssueApi.list(projectId, true),
+    const [memberValues, issueValues, taskValues] = await Promise.all([
+      groupApi.members(projectValue.groupId), projectIssueApi.list(projectId, true), taskApi.list(projectValue.groupId),
     ]);
     setProject(projectValue); setMembers(memberValues); setNodes(issueValues);
+    setTasks(taskValues.filter((task) => task.projectId === projectId));
   };
   useEffect(() => {
     if (!Number.isInteger(projectId) || projectId < 1) { setLoading(false); return; }
@@ -128,22 +131,23 @@ export function ProjectFlowPage() {
   return <><AppNavigation /><main className="project-flow-page app-page">
     <header className="flow-header"><div><Link to={`/groups/${project.groupId}/projects`}>← {t('프로젝트 목록', 'Projects')}</Link>
       <span className="page-eyebrow">PROJECT WORKSPACE</span><h1>{project.name}</h1>
-      <p>{t('프로젝트의 주제와 내용을 나누고, 실행 항목과 체크리스트까지 한 흐름으로 관리합니다.', 'Organize project topics and details, then manage action items and checklists in one flow.')}</p></div>
+      <p>{t('프로젝트 안에서 주제를 나누고, 각 주제의 업무와 진행 상황을 한 흐름으로 관리합니다.', 'Organize topics, tasks, and progress in one project flow.')}</p></div>
       {project.canManageFlow && <button className="primary" type="button" onClick={() => openCreate('MAJOR')}>＋ {t('주제 추가', 'Add topic')}</button>}
     </header>
     {error && <p className="error">{error}</p>}
     <section className="flow-overview" aria-label={t('프로젝트 현황', 'Project overview')}>
       <div><span>{t('주제', 'Topics')}</span><strong>{activeNodes.filter((node) => node.level === 'MAJOR').length}</strong></div>
-      <div><span>{t('내용', 'Details')}</span><strong>{activeNodes.filter((node) => node.level === 'MIDDLE').length}</strong></div>
-      <div><span>{t('실행 항목', 'Action items')}</span><strong>{activeNodes.filter((node) => node.level === 'ISSUE').length}</strong></div>
-      <div><span>{t('완료', 'Done')}</span><strong>{activeNodes.filter((node) => node.level === 'ISSUE' && node.status === 'DONE').length}</strong></div>
+      <div><span>{t('진행 업무', 'Active tasks')}</span><strong>{tasks.filter((task) => !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(task.status)).length}</strong></div>
+      <div><span>{t('연결 업무', 'Linked tasks')}</span><strong>{tasks.length}</strong></div>
+      <div><span>{t('완료 업무', 'Completed')}</span><strong>{tasks.filter((task) => task.status === 'COMPLETED').length}</strong></div>
     </section>
     <ProjectFileSystem project={project} nodes={nodes} />
     {(children.get(undefined) ?? []).length === 0 ? <section className="flow-empty"><h2>{t('첫 주제를 추가해 주세요', 'Add your first topic')}</h2><p>{t('예: 사용자 기능, 결제 시스템, 운영자 기능', 'Examples: User features, Payments, Admin features')}</p></section>
       : <div className="flow-major-list">{(children.get(undefined) ?? []).map((major) => <section className="flow-major" key={major.id}>
         <header><div><span>{t('주제', 'TOPIC')}</span><h2>{major.title}</h2>{major.description && <p>{major.description}</p>}</div>
-          {major.canManage && <div className="flow-actions"><button className="secondary" onClick={() => openCreate('MIDDLE', major.id)}>＋ {t('내용 추가', 'Add detail')}</button><button className="ghost" onClick={() => openEdit(major)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(major)}>{t('보관', 'Archive')}</button></div>}</header>
-        <div className="flow-middle-list">{(children.get(major.id) ?? []).map((middle) => <section className="flow-middle" key={middle.id}>
+          <div className="flow-actions"><Link className="primary button-link" to={`/groups/${project.groupId}/tasks?projectId=${project.id}&topicId=${major.id}&create=1`}>＋ {t('업무 추가', 'Add task')}</Link>{major.canManage && <><button className="ghost" onClick={() => openEdit(major)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(major)}>{t('보관', 'Archive')}</button></>}</div></header>
+        <div className="project-topic-tasks"><div className="project-topic-task-heading"><strong>{t('이 주제의 업무', 'Tasks in this topic')}</strong><span>{tasks.filter((task) => task.projectTopicId === major.id).length}</span></div>{tasks.filter((task) => task.projectTopicId === major.id).length === 0 ? <p>{t('아직 연결된 업무가 없습니다.', 'No tasks are linked yet.')}</p> : <div>{tasks.filter((task) => task.projectTopicId === major.id).map((task) => <Link to={`/tasks/${task.id}`} key={task.id}><span className={`issue-status issue-${task.status.toLowerCase()}`}>{taskStatusLabel(task.status, language)}</span><strong>{task.title}</strong><small>{task.assigneeMemberId ? members.find((member) => member.id === task.assigneeMemberId)?.nickname : t('담당자 미지정', 'Unassigned')}</small></Link>)}</div>}</div>
+        {(children.get(major.id) ?? []).length > 0 && <details className="legacy-project-details"><summary>{t(`기존 세부 내용 ${(children.get(major.id) ?? []).length}개`, `${(children.get(major.id) ?? []).length} legacy details`)}</summary><p>{t('기존에 등록한 내용과 실행 항목입니다. 새 업무는 위의 업무 추가를 이용해 주세요.', 'These are existing details and action items. Use Add task above for new work.')}</p><div className="flow-middle-list">{(children.get(major.id) ?? []).map((middle) => <section className="flow-middle" key={middle.id}>
           <header><div><span>{t('내용', 'DETAIL')}</span><h3>{middle.title}</h3></div><div className="flow-actions">
             {project.status !== 'ARCHIVED' && <button className="secondary" onClick={() => openCreate('ISSUE', middle.id)}>＋ {t('실행 항목', 'Action item')}</button>}
             {middle.canManage && <><button className="ghost" onClick={() => openEdit(middle)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(middle)}>{t('보관', 'Archive')}</button></>}
@@ -159,7 +163,7 @@ export function ProjectFlowPage() {
               {issue.images.length > 0 && <div className="issue-images">{issue.images.map((image) => <div key={image.id}><AuthenticatedIssueImage image={image} alt={image.originalFilename} />{image.canDelete && <button type="button" aria-label={t('이미지 삭제', 'Delete image')} onClick={() => deleteImage(issue, image)}>×</button>}</div>)}</div>}
               {issue.canManage && <div className="issue-footer-actions"><label className="secondary file-button">＋ {t('이미지', 'Image')}<input type="file" accept="image/jpeg,image/png,image/gif" onChange={(event) => uploadImage(issue, event)} /></label><button className="ghost" onClick={() => openEdit(issue)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(issue)}>{t('보관', 'Archive')}</button></div>}
             </article>)}</div>}
-        </section>)}</div>
+        </section>)}</div></details>}
       </section>)}</div>}
     {archivedNodes.length > 0 && <details className="archived-projects archived-issues"><summary>{t(`보관된 항목 ${archivedNodes.length}개`, `${archivedNodes.length} archived items`)}</summary>
       <div className="archived-issue-list">{archivedNodes.map((node) => <article key={node.id}><div><strong>{node.title}</strong><small>{levelLabel(node.level, language)} · {node.archivedAt ? new Date(node.archivedAt).toLocaleDateString() : ''}</small></div>
@@ -185,6 +189,11 @@ function levelTitle(level: IssueLevel, language: 'ko' | 'en') {
 function levelLabel(level: IssueLevel, language: 'ko' | 'en') {
   const values = { MAJOR: ['주제', 'Topic'], MIDDLE: ['내용', 'Detail'], ISSUE: ['실행 항목', 'Action item'] } as const;
   return values[level][language === 'ko' ? 0 : 1];
+}
+
+function taskStatusLabel(status: TaskResponse['status'], language: 'ko' | 'en') {
+  const values: Record<TaskResponse['status'], [string, string]> = { REQUESTED: ['승인 대기', 'Pending'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'], COMPLETED: ['완료', 'Completed'], REJECTED: ['반려', 'Rejected'], CANCELLED: ['취소', 'Cancelled'] };
+  return values[status][language === 'ko' ? 0 : 1];
 }
 
 function AuthenticatedIssueImage({ image, alt }: { image: IssueImage; alt: string }) {
