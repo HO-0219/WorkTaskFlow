@@ -248,7 +248,11 @@ public class NotificationService {
     }
 
     private String targetUrl(Notification notification) {
-        return notification.getTask() != null ? "/tasks/" + notification.getTask().getId()
+        return notification.getEventKey().startsWith("EMERGENCY_ISSUE:") && notification.getGroup() != null
+                ? "/groups/" + notification.getGroup().getId() + "/emergency-issues"
+                : notification.getEventKey().startsWith("ASSIGNEE_CHANGE_") && notification.getGroup() != null
+                ? "/groups/" + notification.getGroup().getId() + "/dashboard"
+                : notification.getTask() != null ? "/tasks/" + notification.getTask().getId()
                 : notification.getType() == Notification.Type.SECURITY_NEW_DEVICE
                         || notification.getType() == Notification.Type.SECURITY_SESSION_REUSED ? "/account"
                 : notification.getType() == Notification.Type.SUBSCRIPTION_ROLLOUT_NOTICE

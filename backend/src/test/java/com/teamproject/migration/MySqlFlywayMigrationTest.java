@@ -27,7 +27,7 @@ class MySqlFlywayMigrationTest {
                     .withPassword("worktaskflow");
 
     @Test
-    void migratesFreshMySqlSchemaFromV1ThroughV43() throws Exception {
+    void migratesFreshMySqlSchemaFromV1ThroughV45() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
@@ -35,7 +35,7 @@ class MySqlFlywayMigrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("43");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("45");
         assertThat(countSchemaObjects(
                 "information_schema.tables",
                 "table_name",
@@ -54,8 +54,10 @@ class MySqlFlywayMigrationTest {
                         "project_documents",
                         "chat_channels",
                         "chat_messages",
-                        "chat_socket_tickets")))
-                .isEqualTo(15);
+                        "chat_socket_tickets",
+                        "task_assignee_change_requests",
+                        "emergency_issues")))
+                .isEqualTo(17);
         assertThat(countColumns(
                 "reports",
                 List.of(
@@ -71,8 +73,11 @@ class MySqlFlywayMigrationTest {
                 List.of(
                         "blocker_type",
                         "blocker_next_action_type",
-                        "blocker_review_date")))
-                .isEqualTo(3);
+                        "blocker_review_date",
+                        "project_id",
+                        "project_topic_id",
+                        "deleted_at")))
+                .isEqualTo(6);
         assertThat(countColumns(
                 "payment_attempts",
                 List.of(

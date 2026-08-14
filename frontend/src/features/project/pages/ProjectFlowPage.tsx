@@ -125,6 +125,10 @@ export function ProjectFlowPage() {
   const activeMembers = members.filter((member) => member.status === 'ACTIVE');
   const activeNodes = nodes.filter((node) => !node.archivedAt);
   const archivedNodes = nodes.filter((node) => node.archivedAt);
+  const activeTasks = tasks.filter((task) => !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(task.status));
+  const completedTasks = tasks.filter((task) => task.status === 'COMPLETED');
+  const unclassifiedTasks = tasks.filter((task) => task.projectTopicId == null);
+  const completionRate = tasks.length === 0 ? 0 : Math.round(completedTasks.length * 100 / tasks.length);
   const statusLabel = (value: IssueStatus) => {
     const found = statuses.find(([key]) => key === value)!; return language === 'ko' ? found[1] : found[2];
   };
@@ -137,16 +141,16 @@ export function ProjectFlowPage() {
     {error && <p className="error">{error}</p>}
     <section className="flow-overview" aria-label={t('프로젝트 현황', 'Project overview')}>
       <div><span>{t('주제', 'Topics')}</span><strong>{activeNodes.filter((node) => node.level === 'MAJOR').length}</strong></div>
-      <div><span>{t('진행 업무', 'Active tasks')}</span><strong>{tasks.filter((task) => !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(task.status)).length}</strong></div>
+      <div><span>{t('진행 업무', 'Active tasks')}</span><strong>{activeTasks.length}</strong></div>
       <div><span>{t('연결 업무', 'Linked tasks')}</span><strong>{tasks.length}</strong></div>
-      <div><span>{t('완료 업무', 'Completed')}</span><strong>{tasks.filter((task) => task.status === 'COMPLETED').length}</strong></div>
+      <div><span>{t('완료 업무', 'Completed')}</span><strong>{completedTasks.length}</strong></div>
     </section>
-    <ProjectFileSystem project={project} nodes={nodes} />
+    <section className="project-health-strip"><div><span>{t('전체 진행률', 'Overall progress')}</span><strong>{completionRate}%</strong></div><progress value={completionRate} max={100} /><p>{tasks.length === 0 ? t('첫 업무를 연결하면 프로젝트 진행률이 표시됩니다.', 'Link the first task to start tracking project progress.') : t(`${tasks.length}개 업무 중 ${completedTasks.length}개를 완료했습니다.`, `${completedTasks.length} of ${tasks.length} tasks completed.`)}</p></section>
     {(children.get(undefined) ?? []).length === 0 ? <section className="flow-empty"><h2>{t('첫 주제를 추가해 주세요', 'Add your first topic')}</h2><p>{t('예: 사용자 기능, 결제 시스템, 운영자 기능', 'Examples: User features, Payments, Admin features')}</p></section>
       : <div className="flow-major-list">{(children.get(undefined) ?? []).map((major) => <section className="flow-major" key={major.id}>
         <header><div><span>{t('주제', 'TOPIC')}</span><h2>{major.title}</h2>{major.description && <p>{major.description}</p>}</div>
           <div className="flow-actions"><Link className="primary button-link" to={`/groups/${project.groupId}/tasks?projectId=${project.id}&topicId=${major.id}&create=1`}>＋ {t('업무 추가', 'Add task')}</Link>{major.canManage && <><button className="ghost" onClick={() => openEdit(major)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(major)}>{t('보관', 'Archive')}</button></>}</div></header>
-        <div className="project-topic-tasks"><div className="project-topic-task-heading"><strong>{t('이 주제의 업무', 'Tasks in this topic')}</strong><span>{tasks.filter((task) => task.projectTopicId === major.id).length}</span></div>{tasks.filter((task) => task.projectTopicId === major.id).length === 0 ? <p>{t('아직 연결된 업무가 없습니다.', 'No tasks are linked yet.')}</p> : <div>{tasks.filter((task) => task.projectTopicId === major.id).map((task) => <Link to={`/tasks/${task.id}`} key={task.id}><span className={`issue-status issue-${task.status.toLowerCase()}`}>{taskStatusLabel(task.status, language)}</span><strong>{task.title}</strong><small>{task.assigneeMemberId ? members.find((member) => member.id === task.assigneeMemberId)?.nickname : t('담당자 미지정', 'Unassigned')}</small></Link>)}</div>}</div>
+        <ProjectTaskList title={t('이 주제의 업무', 'Tasks in this topic')} tasks={tasks.filter((task) => task.projectTopicId === major.id)} members={members} language={language} empty={t('아직 연결된 업무가 없습니다. 위 업무 추가를 누르면 이 주제가 자동 선택됩니다.', 'No tasks are linked yet. Add task will preselect this topic.')} />
         {(children.get(major.id) ?? []).length > 0 && <details className="legacy-project-details"><summary>{t(`기존 세부 내용 ${(children.get(major.id) ?? []).length}개`, `${(children.get(major.id) ?? []).length} legacy details`)}</summary><p>{t('기존에 등록한 내용과 실행 항목입니다. 새 업무는 위의 업무 추가를 이용해 주세요.', 'These are existing details and action items. Use Add task above for new work.')}</p><div className="flow-middle-list">{(children.get(major.id) ?? []).map((middle) => <section className="flow-middle" key={middle.id}>
           <header><div><span>{t('내용', 'DETAIL')}</span><h3>{middle.title}</h3></div><div className="flow-actions">
             {project.status !== 'ARCHIVED' && <button className="secondary" onClick={() => openCreate('ISSUE', middle.id)}>＋ {t('실행 항목', 'Action item')}</button>}
@@ -165,6 +169,8 @@ export function ProjectFlowPage() {
             </article>)}</div>}
         </section>)}</div></details>}
       </section>)}</div>}
+    {unclassifiedTasks.length > 0 && <section className="unclassified-project-tasks"><header><div><span className="page-eyebrow">NEEDS TOPIC</span><h2>{t('주제 미분류 업무', 'Tasks without a topic')}</h2><p>{t('프로젝트에는 연결됐지만 아직 주제가 정해지지 않은 업무입니다.', 'These tasks belong to the project but do not have a topic yet.')}</p></div><Link className="secondary button-link" to={`/groups/${project.groupId}/tasks`}>{t('업무에서 주제 지정', 'Assign topics')}</Link></header><ProjectTaskList title={t('미분류 업무', 'Unclassified tasks')} tasks={unclassifiedTasks} members={members} language={language} empty="" /></section>}
+    <details className="project-support-tools"><summary><span>📁</span><div><strong>{t('프로젝트 파일·링크', 'Project files and links')}</strong><small>{t('필요할 때 열어 파일과 자료를 관리합니다.', 'Open when you need to manage project resources.')}</small></div></summary><ProjectFileSystem project={project} nodes={nodes} /></details>
     {archivedNodes.length > 0 && <details className="archived-projects archived-issues"><summary>{t(`보관된 항목 ${archivedNodes.length}개`, `${archivedNodes.length} archived items`)}</summary>
       <div className="archived-issue-list">{archivedNodes.map((node) => <article key={node.id}><div><strong>{node.title}</strong><small>{levelLabel(node.level, language)} · {node.archivedAt ? new Date(node.archivedAt).toLocaleDateString() : ''}</small></div>
         {node.images.length > 0 && <div className="issue-images">{node.images.map((image) => <div key={image.id}><AuthenticatedIssueImage image={image} alt={image.originalFilename} />{image.canDelete && <button type="button" aria-label={t('이미지 삭제', 'Delete image')} onClick={() => deleteImage(node, image)}>×</button>}</div>)}</div>}</article>)}</div>
@@ -194,6 +200,10 @@ function levelLabel(level: IssueLevel, language: 'ko' | 'en') {
 function taskStatusLabel(status: TaskResponse['status'], language: 'ko' | 'en') {
   const values: Record<TaskResponse['status'], [string, string]> = { REQUESTED: ['승인 대기', 'Pending'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'], COMPLETED: ['완료', 'Completed'], REJECTED: ['반려', 'Rejected'], CANCELLED: ['취소', 'Cancelled'] };
   return values[status][language === 'ko' ? 0 : 1];
+}
+
+function ProjectTaskList({ title, tasks, members, language, empty }: { title: string; tasks: TaskResponse[]; members: MemberResponse[]; language: 'ko' | 'en'; empty: string }) {
+  return <div className="project-topic-tasks"><div className="project-topic-task-heading"><strong>{title}</strong><span>{tasks.length}</span></div>{tasks.length === 0 ? <p>{empty}</p> : <div>{tasks.map((task) => <Link to={`/tasks/${task.id}`} key={task.id}><span className={`issue-status issue-${task.status.toLowerCase()}`}>{taskStatusLabel(task.status, language)}</span><strong>{task.title}</strong><small>{task.assigneeMemberId ? members.find((member) => member.id === task.assigneeMemberId)?.nickname ?? (language === 'ko' ? '담당자 확인 필요' : 'Unknown assignee') : language === 'ko' ? '담당자 미지정' : 'Unassigned'}</small></Link>)}</div>}</div>;
 }
 
 function AuthenticatedIssueImage({ image, alt }: { image: IssueImage; alt: string }) {

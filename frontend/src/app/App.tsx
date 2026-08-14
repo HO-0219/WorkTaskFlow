@@ -31,6 +31,7 @@ import { DemoPage } from './DemoPage';
 import { AiAssistantPage } from '../features/assistant/AiAssistantPage';
 import { ProjectsPage } from '../features/project/pages/ProjectsPage';
 import { ProjectFlowPage } from '../features/project/pages/ProjectFlowPage';
+import { EmergencyIssuesPage } from '../features/project/pages/EmergencyIssuesPage';
 import { ChatHubPage, ChatPage } from '../features/chat/ChatPage';
 
 export default function App() {
@@ -65,6 +66,7 @@ export default function App() {
     <Route path="/chat" element={<ChatHubPage />} />
     <Route path="/groups/:groupId/chat" element={<ChatPage />} />
     <Route path="/projects/:projectId/flow" element={<ProjectFlowPage />} />
+    <Route path="/groups/:groupId/emergency-issues" element={<EmergencyIssuesPage />} />
     <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
     <Route path="/assistant" element={<AiAssistantPage />} />

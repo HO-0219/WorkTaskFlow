@@ -161,6 +161,11 @@ public class TaskService {
         requireLeader(actor);
         requireVersion(task, request.expectedVersion());
         if (isTerminal(task.getStatus())) invalidTransition();
+        if (task.getAssignee() != null
+                && !task.getAssignee().getId().equals(request.assigneeMemberId())) {
+            throw new ApplicationException("ASSIGNEE_CHANGE_APPROVAL_REQUIRED", HttpStatus.CONFLICT,
+                    "진행 중인 업무의 담당자 변경은 변경 요청 후 팀장 승인이 필요합니다.");
+        }
         GroupMember assignee = authorization.requireActiveMemberById(
                 task.getGroup().getId(), request.assigneeMemberId());
         task.assign(assignee);
@@ -316,9 +321,9 @@ public class TaskService {
             }
             return;
         }
-        if (task.getStatus() == Task.Status.REJECTED || task.getStatus() == Task.Status.CANCELLED) {
+        if (task.getStatus() != Task.Status.REQUESTED && task.getStatus() != Task.Status.COMPLETED) {
             throw new ApplicationException("TASK_EDIT_STATE_INVALID", HttpStatus.CONFLICT,
-                    "반려되거나 취소된 업무는 수정할 수 없습니다.");
+                    "승인 대기 또는 완료 상태의 업무만 내용을 수정할 수 있습니다.");
         }
         boolean requester = task.getRequester().getId().equals(actor.getId());
         boolean assignee = task.getAssignee() != null && task.getAssignee().getId().equals(actor.getId());
