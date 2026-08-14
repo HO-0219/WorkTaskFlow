@@ -46,7 +46,6 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
   const selectedGroupId = pathGroupId ?? new URLSearchParams(search).get('groupId') ?? '';
   const labels = language === 'ko' ? ['홈', '그룹', '채팅', '캘린더', '알림', '비서', '프로필'] : ['Home', 'Groups', 'Chat', 'Calendar', 'Alerts', 'Assistant', 'Profile'];
   const teamGroups = groups.filter((group) => group.type === 'TEAM');
-  const selectedTeamGroup = teamGroups.find((group) => String(group.id) === selectedGroupId);
   const demo = sessionMode.isDemo();
   async function exitDemo() {
     await authApi.logout().catch(() => undefined);
@@ -63,11 +62,9 @@ export function AppNavigation({ unreadCount }: { unreadCount?: number }) {
       navigate(group.type === 'PERSONAL' ? `/calendar?groupId=${group.id}` : `/groups/${group.id}/dashboard`);
     }}><option value="">{language === 'ko' ? '전체 그룹 보기' : 'View all groups'}</option><optgroup label={language === 'ko' ? '개인 일정' : 'Personal schedule'}>{groups.filter((group) => group.type === 'PERSONAL').map((group) => <option value={group.id} key={group.id}>● {group.name}</option>)}</optgroup><optgroup label={language === 'ko' ? '팀 그룹' : 'Teams'}>{teamGroups.map((group) => <option value={group.id} key={group.id}>◆ {group.name}</option>)}</optgroup></select><small>{language === 'ko' ? '목록을 열어 다른 그룹으로 바로 이동하세요.' : 'Open the list to move directly to another group.'}</small></label>}
     <div className="app-navigation-items">{items.map((item, index) => {
-      const destination = item.to === '/chat'
-        ? (selectedTeamGroup ?? teamGroups[0]) ? `/groups/${(selectedTeamGroup ?? teamGroups[0]).id}/chat` : '/groups'
-        : item.to;
+      const destination = item.to;
       const active = item.to === '/app' ? pathname === '/app'
-        : item.to === '/chat' ? /^\/groups\/\d+\/chat$/.test(pathname) : pathname.startsWith(item.to);
+        : item.to === '/chat' ? pathname === '/chat' || /^\/groups\/\d+\/chat$/.test(pathname) : pathname.startsWith(item.to);
       return <Link className={active ? 'active' : ''} to={destination} key={item.to} aria-current={active ? 'page' : undefined}>
         <span className="app-navigation-icon" aria-hidden="true">{item.icon}</span>
         <span>{labels[index]}</span>

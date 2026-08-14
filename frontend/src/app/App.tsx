@@ -31,7 +31,7 @@ import { DemoPage } from './DemoPage';
 import { AiAssistantPage } from '../features/assistant/AiAssistantPage';
 import { ProjectsPage } from '../features/project/pages/ProjectsPage';
 import { ProjectFlowPage } from '../features/project/pages/ProjectFlowPage';
-import { ChatPage } from '../features/chat/ChatPage';
+import { ChatHubPage, ChatPage } from '../features/chat/ChatPage';
 
 export default function App() {
   return <LanguageProvider><BrowserRouter>
@@ -62,6 +62,7 @@ export default function App() {
     <Route path="/groups/:groupId/members" element={<GroupMembersPage />} />
     <Route path="/groups/:groupId/tasks" element={<TasksPage />} />
     <Route path="/groups/:groupId/projects" element={<ProjectsPage />} />
+    <Route path="/chat" element={<ChatHubPage />} />
     <Route path="/groups/:groupId/chat" element={<ChatPage />} />
     <Route path="/projects/:projectId/flow" element={<ProjectFlowPage />} />
     <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
@@ -113,7 +114,7 @@ function RouteAnnouncer() {
 
 function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (language === 'en') {
-    if (pathname === '/') return 'Gearvia'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts'; if (pathname === '/assistant') return 'AI assistant';
+    if (pathname === '/') return 'Gearvia'; if (pathname === '/app') return 'Dashboard'; if (pathname === '/chat') return 'Chat'; if (pathname === '/calendar') return 'Calendar'; if (pathname === '/notifications') return 'Alerts'; if (pathname === '/assistant') return 'AI assistant';
     if (pathname === '/demo') return 'Product demo';
     if (pathname === '/groups') return 'Groups'; if (pathname === '/profile') return 'Profile'; if (pathname === '/account') return 'Account settings';
     if (pathname === '/payments') return 'Payments'; if (pathname === '/admin') return 'Admin';
@@ -127,6 +128,7 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (pathname === '/') return 'Gearvia';
   if (pathname === '/demo') return '제품 데모';
   if (pathname === '/app') return '내 대시보드';
+  if (pathname === '/chat') return '채팅';
   if (pathname === '/calendar') return '캘린더';
   if (pathname === '/notifications') return '알림';
   if (pathname === '/assistant') return 'AI 업무 비서';

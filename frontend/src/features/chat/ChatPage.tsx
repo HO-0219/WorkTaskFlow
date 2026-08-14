@@ -9,6 +9,37 @@ import { AppNavigation, Modal } from '../../app/AppNavigation';
 import { AuthenticatedImage } from '../../app/AuthenticatedImage';
 import { useLanguage } from '../../app/LanguageContext';
 
+type GroupChannels = { group: GroupResponse; channels: ChatChannel[] };
+
+export function ChatHubPage() {
+  const { t } = useLanguage();
+  const [groups, setGroups] = useState<GroupChannels[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    groupApi.list().then((values) => Promise.all(values.filter((group) => group.type === 'TEAM').map(async (group) => ({
+      group,
+      channels: await chatApi.channels(group.id),
+    })))).then((values) => { if (active) setGroups(values); })
+      .catch((value) => { if (active) setError(errorMessage(value)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  if (!accessToken.get()) return <Navigate to="/login" replace />;
+  return <><AppNavigation /><main className="chat-hub-page app-page">
+    <header className="chat-hub-header"><div><span className="page-eyebrow">TEAM CHAT</span><h1>{t('채팅', 'Chat')}</h1><p>{t('그룹을 고른 다음, 이어서 대화할 채팅방을 선택하세요.', 'Choose a group, then select the channel you want to continue.')}</p></div><Link className="secondary" to="/groups">{t('그룹 관리', 'Manage groups')}</Link></header>
+    {error && <p className="error">{error}</p>}
+    {loading ? <p className="muted">{t('채팅방을 불러오는 중...', 'Loading channels...')}</p> : groups.length === 0 ? <section className="chat-hub-empty"><h2>{t('참여 중인 팀 그룹이 없습니다.', 'You are not in a team group yet.')}</h2><p>{t('그룹을 만들거나 초대받은 그룹에 참여하면 여기에서 채팅을 시작할 수 있습니다.', 'Create or join a group to start chatting here.')}</p><Link className="primary button-link" to="/groups">{t('그룹 시작하기', 'Get started with groups')}</Link></section>
+      : <section className="chat-group-grid" aria-label={t('그룹별 채팅방', 'Channels by group')}>{groups.map(({ group, channels }, index) => <article className="chat-group-card" key={group.id}>
+        <header><span className={`chat-group-avatar chat-group-avatar-${index % 4}`}>{group.imageUrl ? <AuthenticatedImage src={group.imageUrl} alt="" /> : group.name.trim().charAt(0).toUpperCase()}</span><div><h2>{group.name}</h2><p>{t(`${channels.length}개 채팅방`, `${channels.length} channels`)}</p></div><Link to={`/groups/${group.id}/dashboard`}>{t('대시보드', 'Dashboard')} →</Link></header>
+        <div className="chat-hub-channel-list">{channels.length === 0 ? <p>{t('사용할 수 있는 채팅방이 없습니다.', 'No channels are available.')}</p> : channels.map((channel) => <Link key={channel.id} to={`/groups/${group.id}/chat?channel=${channel.id}`}><span aria-hidden="true">{channel.type === 'GENERAL' ? '●' : '#'}</span><span><strong>{channel.name}</strong><small>{channel.issueNodeTitle ?? channel.projectName ?? t('그룹 전체', 'Whole group')}</small></span><b aria-hidden="true">›</b></Link>)}</div>
+      </article>)}</section>}
+  </main></>;
+}
+
 export function ChatPage() {
   const { t, language } = useLanguage();
   const groupId = Number(useParams().groupId);
@@ -28,7 +59,6 @@ export function ChatPage() {
   const [channelName, setChannelName] = useState('');
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [members, setMembers] = useState<MemberResponse[]>([]);
-  const [showMembers, setShowMembers] = useState(false);
   const [projectId, setProjectId] = useState('');
   const [majorIssues, setMajorIssues] = useState<ProjectIssue[]>([]);
   const [majorId, setMajorId] = useState('');
@@ -169,15 +199,15 @@ export function ChatPage() {
   return <><AppNavigation /><main className="chat-page app-page">
     <header className="chat-page-header"><div><Link to={`/groups/${groupId}/dashboard`}>← {t('그룹 대시보드', 'Group dashboard')}</Link><h1>{t('팀 채팅', 'Team chat')}</h1><p>{t(`${group.name} 팀의 업무 대화와 자료를 한곳에서 나누세요.`, `Discuss work and share files with ${group.name} in one place.`)}</p></div></header>
     {error && <p className="error">{error}</p>}
-    <div className="chat-layout"><aside className="chat-channels"><header><h2>{t('채팅방', 'Channels')}</h2>{features?.multipleChatChannels && (group.role === 'LEADER' || projects.some((project) => project.canManageFlow)) && <button type="button" onClick={() => { setChannelName(''); setProjectId(''); setMajorId(''); setShowChannel(true); }}>＋</button>}</header>
+    <div className="chat-layout"><aside className="chat-channels"><header><div><Link className="chat-group-picker-link" to="/chat">{t('그룹 선택', 'Choose group')}</Link><h2>{group.name}</h2></div>{features?.multipleChatChannels && (group.role === 'LEADER' || projects.some((project) => project.canManageFlow)) && <button type="button" onClick={() => { setChannelName(''); setProjectId(''); setMajorId(''); setShowChannel(true); }}>＋</button>}</header>
       {channels.map((channel) => <button className={selectedId === channel.id ? 'selected' : ''} key={channel.id} onClick={() => selectChannel(channel.id)}><span>{channel.type === 'GENERAL' ? '●' : '#'}</span><div><strong>{channel.name}</strong><small>{channel.issueNodeTitle ?? channel.projectName ?? t('그룹 전체', 'Whole group')}</small></div></button>)}
       {!features?.multipleChatChannels && <p>{t('무료 그룹은 공용 채팅방 1개를 사용합니다.', 'Free groups use one shared channel.')}</p>}
-    </aside><section className="chat-room"><header><div><h2>{selected?.name ?? t('채팅방', 'Channel')}</h2><p>{selected?.issueNodeTitle ?? selected?.projectName ?? t('모든 팀원이 참여하는 그룹 공용 대화', 'A group conversation for every teammate')}</p></div><button className="chat-member-toggle" type="button" aria-expanded={showMembers} onClick={() => setShowMembers((value) => !value)}>♙ {t(`${members.length}명`, `${members.length} members`)}</button></header>
+    </aside><section className="chat-room"><header><div><h2>{selected?.name ?? t('채팅방', 'Channel')}</h2><p>{selected?.issueNodeTitle ?? selected?.projectName ?? t('모든 팀원이 참여하는 그룹 공용 대화', 'A group conversation for every teammate')}</p></div><Link className="chat-member-link" to={`/groups/${groupId}/members`}>♙ {t(`${members.length}명`, `${members.length} members`)}</Link></header>
       {connection !== 'OPEN' && <p className="chat-connection-notice" role="status">{connection === 'CONNECTING' ? t('대화 내용을 연결하고 있습니다.', 'Connecting to the conversation.') : t('실시간 업데이트를 복구 중입니다. 메시지는 계속 전송할 수 있습니다.', 'Restoring live updates. You can continue sending messages.')}</p>}
       <div className="chat-messages">{nextBeforeId && <button className="older-messages" onClick={older}>{t('이전 메시지 불러오기', 'Load older messages')}</button>}{messages.length === 0 && <p className="chat-empty">{t('아직 메시지가 없습니다. 첫 대화를 시작하세요.', 'No messages yet. Start the conversation.')}</p>}
-        {messages.map((message) => <article className="chat-message" key={message.id}><div className="chat-avatar">{message.senderNickname.slice(0, 1)}</div><div><header><strong>{message.senderNickname}</strong><time>{formatTime(message.createdAt, language)}</time></header>{message.content && <p>{message.content}</p>}{message.type === 'IMAGE' && <ChatImage message={message} />}{message.type === 'FILE' && <button className="chat-file" onClick={() => chatApi.download(message).catch((value) => setError(errorMessage(value)))}>▤ <span>{message.originalFilename}</span><small>{formatBytes(message.sizeBytes ?? 0)}</small></button>}</div></article>)}<div ref={messageEnd} />
-      </div><form className={`chat-composer ${attachment ? 'has-attachment' : ''}`} onSubmit={send}>{attachment && <AttachmentPreview file={attachment} onRemove={() => setAttachment(undefined)} />}<label className={`chat-attach ${attachment ? 'selected' : ''}`} title={t('파일 또는 이미지 첨부', 'Attach a file or image')}>＋<input type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.txt,.csv,.docx,.xlsx,.pptx,.zip" onChange={chooseAttachment} /></label><textarea rows={1} maxLength={4000} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={attachment ? t('첨부 파일에 설명을 추가하세요 (선택)', 'Add a caption (optional)') : t('메시지를 입력하세요', 'Type a message')} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><button className="primary" disabled={uploading || (!draft.trim() && !attachment)}>{uploading ? t('올리는 중...', 'Uploading...') : t('전송', 'Send')}</button></form>
-    </section><aside className={`chat-members ${showMembers ? 'open' : ''}`}><header><div><h2>{t('팀원', 'Teammates')}</h2><p>{t('이 그룹의 활성 팀원', 'Active members of this group')}</p></div><button type="button" onClick={() => setShowMembers(false)} aria-label={t('팀원 목록 닫기', 'Close member list')}>×</button></header><div className="chat-member-list">{members.map((member) => <div className="chat-member" key={member.id}><span>{member.profileImageUrl ? <AuthenticatedImage src={member.profileImageUrl} alt="" /> : member.nickname.slice(0, 1)}</span><div><strong>{member.nickname}</strong><small>{t(member.role === 'LEADER' ? '팀장' : '팀원', member.role === 'LEADER' ? 'Leader' : 'Member')}</small></div></div>)}</div><p>{t('이 그룹의 모든 활성 팀원이 채팅방을 보고 메시지를 보낼 수 있습니다.', 'Every active teammate can view and send messages in these channels.')}</p></aside></div>
+        {messages.map((message) => <article className="chat-message" key={message.id}><div className="chat-avatar">{message.senderProfileImageUrl ? <AuthenticatedImage src={message.senderProfileImageUrl} alt="" /> : message.senderNickname.slice(0, 1)}</div><div><header><strong>{message.senderNickname}</strong><time>{formatTime(message.createdAt, language)}</time></header>{message.content && <p>{message.content}</p>}{message.type === 'IMAGE' && <ChatImage message={message} />}{message.type === 'FILE' && <button className="chat-file" onClick={() => chatApi.download(message).catch((value) => setError(errorMessage(value)))}>▤ <span>{message.originalFilename}</span><small>{formatBytes(message.sizeBytes ?? 0)}</small></button>}</div></article>)}<div ref={messageEnd} />
+      </div><form className={`chat-composer ${attachment ? 'has-attachment' : ''}`} onSubmit={send}>{attachment && <AttachmentPreview file={attachment} uploading={uploading} onRemove={() => setAttachment(undefined)} />}<label className={`chat-attach ${attachment ? 'selected' : ''}`} title={t('파일 또는 이미지 첨부', 'Attach a file or image')}>＋<input type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.txt,.csv,.docx,.xlsx,.pptx,.zip" onChange={chooseAttachment} /></label><textarea rows={1} maxLength={4000} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={attachment ? t('첨부 파일에 설명을 추가하세요 (선택)', 'Add a caption (optional)') : t('메시지를 입력하세요', 'Type a message')} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><button type="submit" className="primary chat-send-button" disabled={uploading || (!draft.trim() && !attachment)}>{uploading ? t('올리는 중...', 'Uploading...') : t('전송', 'Send')}</button></form>
+    </section></div>
     {showChannel && <Modal title={t('새 채팅방', 'New channel')} onClose={() => setShowChannel(false)}><form className="form modal-form" onSubmit={createChannel}><label className="field"><span>{t('채팅방 이름', 'Channel name')}</span><input autoFocus required maxLength={80} value={channelName} onChange={(event) => setChannelName(event.target.value)} /></label><label className="field"><span>{t('프로젝트', 'Project')}</span><select required={group.role !== 'LEADER'} value={projectId} onChange={(event) => { setProjectId(event.target.value); setMajorId(''); }}>{group.role === 'LEADER' && <option value="">{t('그룹 전체', 'Whole group')}</option>}{group.role !== 'LEADER' && <option value="">{t('프로젝트 선택', 'Select a project')}</option>}{channelProjects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{projectId && <label className="field"><span>{t('대주제', 'Major topic')}</span><select value={majorId} onChange={(event) => setMajorId(event.target.value)}><option value="">{t('프로젝트 전체', 'Whole project')}</option>{majorIssues.map((issue) => <option key={issue.id} value={issue.id}>{issue.title}</option>)}</select></label>}<div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowChannel(false)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving}>{saving ? t('만드는 중...', 'Creating...') : t('만들기', 'Create')}</button></div></form></Modal>}
   </main></>;
 }
@@ -192,7 +222,7 @@ function ChatImage({ message }: { message: ChatMessage }) {
   return <div className="chat-image-card">{url ? <a href={url} target="_blank" rel="noreferrer"><img className="chat-image" src={url} alt={message.originalFilename ?? ''} loading="lazy" /></a> : <span className="chat-image-placeholder" />}<span>{message.originalFilename}</span></div>;
 }
 
-function AttachmentPreview({ file, onRemove }: { file: File; onRemove: () => void }) {
+function AttachmentPreview({ file, uploading, onRemove }: { file: File; uploading: boolean; onRemove: () => void }) {
   const { t } = useLanguage();
   const [previewUrl, setPreviewUrl] = useState('');
   const image = file.type.startsWith('image/') && /\.(png|jpe?g|gif)$/i.test(file.name);
@@ -201,7 +231,7 @@ function AttachmentPreview({ file, onRemove }: { file: File; onRemove: () => voi
     const url = URL.createObjectURL(file); setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [file, image]);
-  return <div className="chat-attachment-preview">{previewUrl ? <img src={previewUrl} alt="" /> : <span aria-hidden="true">▤</span>}<div><strong>{file.name}</strong><small>{image ? `${formatBytes(file.size)} · ${t('이미지 미리보기', 'Image preview')}` : formatBytes(file.size)}</small></div><button type="button" onClick={onRemove} aria-label={t(`${file.name} 첨부 취소`, `Remove ${file.name}`)}>×</button></div>;
+  return <div className="chat-attachment-preview">{previewUrl ? <img src={previewUrl} alt="" /> : <span aria-hidden="true">▤</span>}<div><strong>{file.name}</strong><small>{image ? `${formatBytes(file.size)} · ${t('이미지 미리보기', 'Image preview')}` : formatBytes(file.size)}</small></div><div className="chat-preview-actions"><button type="button" onClick={onRemove} aria-label={t(`${file.name} 첨부 취소`, `Remove ${file.name}`)}>×</button><button type="submit" className="primary" disabled={uploading}>{uploading ? t('올리는 중...', 'Uploading...') : t('전송', 'Send')}</button></div></div>;
 }
 function formatTime(value: string, language: 'ko' | 'en') { return new Intl.DateTimeFormat(language === 'ko' ? 'ko-KR' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 function formatBytes(value: number) { return value >= 1024 ** 2 ? `${(value / 1024 ** 2).toFixed(1)} MB` : `${Math.max(1, Math.round(value / 1024))} KB`; }
