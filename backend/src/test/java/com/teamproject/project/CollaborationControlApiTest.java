@@ -86,6 +86,36 @@ class CollaborationControlApiTest {
                 .andExpect(jsonPath("$.resolvedAt").exists());
     }
 
+    @Test void topicHasOwnerAndActiveStandaloneTaskCanJoinHierarchy() throws Exception {
+        String leader=signupAndLogin("hierarchy_leader","hierarchy-leader@example.com");
+        long groupId=createGroup(leader,"계층 협업 팀");
+        String memberToken=signupAndLogin("hierarchy_member","hierarchy-member@example.com");
+        GroupMember member=join(groupId,"hierarchy_member");
+        var project=mvc.perform(post("/api/v1/groups/{id}/projects",groupId).header("Authorization","Bearer "+leader)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"계층 프로젝트\",\"leadMemberId\":"+member.getId()+"}"))
+                .andExpect(status().isCreated()).andReturn(); long projectId=number(project,"$.id");
+        var topic=mvc.perform(post("/api/v1/projects/{id}/issues",projectId).header("Authorization","Bearer "+leader)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"level\":\"MAJOR\",\"title\":\"핵심 주제\",\"assigneeMemberId\":"+member.getId()+",\"dueDate\":\"2026-09-01\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.assigneeMemberId").value(member.getId()))
+                .andExpect(jsonPath("$.assigneeNickname").isNotEmpty()).andReturn(); long topicId=number(topic,"$.id");
+        mvc.perform(get("/api/v1/projects/{id}/issues",projectId).header("Authorization","Bearer "+memberToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].canManage").value(true));
+        var task=mvc.perform(post("/api/v1/groups/{id}/tasks",groupId).header("Authorization","Bearer "+leader)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"처음엔 독립 업무\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.projectId").doesNotExist()).andReturn();
+        long taskId=number(task,"$.id"),version=number(task,"$.version");
+        var accepted=mvc.perform(post("/api/v1/tasks/{id}/transitions",taskId).header("Authorization","Bearer "+leader)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"ACCEPT\",\"expectedVersion\":"+version+"}"))
+                .andExpect(status().isOk()).andReturn(); version=number(accepted,"$.version");
+        var assigned=mvc.perform(put("/api/v1/tasks/{id}/assignee",taskId).header("Authorization","Bearer "+leader)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"assigneeMemberId\":"+member.getId()+",\"expectedVersion\":"+version+"}"))
+                .andExpect(status().isOk()).andReturn(); version=number(assigned,"$.version");
+        mvc.perform(patch("/api/v1/tasks/{id}/project-link",taskId).header("Authorization","Bearer "+memberToken)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"projectId\":"+projectId+",\"projectTopicId\":"+topicId+",\"expectedVersion\":"+version+"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.projectName").value("계층 프로젝트"))
+                .andExpect(jsonPath("$.projectTopicTitle").value("핵심 주제"));
+    }
+
     private GroupMember join(long groupId,String username){return members.save(GroupMember.member(groups.findById(groupId).orElseThrow(),users.findByUsernameIgnoreCase(username).orElseThrow()));}
     private long createGroup(String token,String name)throws Exception{return number(mvc.perform(post("/api/v1/groups").header("Authorization","Bearer "+token).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\""+name+"\"}")).andExpect(status().isCreated()).andReturn(),"$.id");}
     private long number(org.springframework.test.web.servlet.MvcResult result,String path)throws Exception{return ((Number)JsonPath.read(result.getResponse().getContentAsString(),path)).longValue();}

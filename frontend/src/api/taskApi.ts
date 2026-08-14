@@ -120,6 +120,7 @@ export const taskApi = {
   update: (taskId: number, body: UpdateTaskRequest) => request<TaskResponse>(`/tasks/${taskId}`, {
     method: 'PATCH', body: JSON.stringify(body),
   }, true),
+  linkProject: (taskId:number, body:{projectId?:number;projectTopicId?:number;clearProjectLink?:boolean;expectedVersion:number}) => request<TaskResponse>(`/tasks/${taskId}/project-link`,{method:'PATCH',body:JSON.stringify(body)},true),
   delete: (taskId: number, expectedVersion: number) => request<void>(`/tasks/${taskId}?expectedVersion=${expectedVersion}`, {
     method: 'DELETE',
   }, true),

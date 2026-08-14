@@ -10,6 +10,7 @@ import com.teamproject.task.application.dto.TaskDtos.TaskHistoryResponse;
 import com.teamproject.task.application.dto.TaskDtos.TaskResponse;
 import com.teamproject.task.application.dto.TaskDtos.TransitionTaskRequest;
 import com.teamproject.task.application.dto.TaskDtos.UpdateTaskRequest;
+import com.teamproject.task.application.dto.TaskDtos.LinkProjectRequest;
 import com.teamproject.group.domain.Group;
 import com.teamproject.notification.application.NotificationService;
 import com.teamproject.project.domain.Project;
@@ -237,6 +238,30 @@ public class TaskService {
         }
         task.delete();
         tasks.flush();
+    }
+
+    @Transactional
+    public TaskResponse linkProject(Long userId, Long taskId, LinkProjectRequest request) {
+        Task task = task(taskId);
+        GroupMember actor = authorization.requireActiveMember(task.getGroup().getId(), userId);
+        requireVersion(task, request.expectedVersion());
+        if (task.getGroup().getType() != Group.Type.TEAM || isTerminal(task.getStatus())) {
+            throw new ApplicationException("TASK_PROJECT_LINK_STATE_INVALID", HttpStatus.CONFLICT,
+                    "진행 중인 팀 업무만 프로젝트 연결을 별도로 변경할 수 있습니다.");
+        }
+        boolean allowed = actor.getRole() == GroupMember.Role.LEADER
+                || task.getRequester().getId().equals(actor.getId())
+                || task.getAssignee() != null && task.getAssignee().getId().equals(actor.getId());
+        if (!allowed) throw new ApplicationException("TASK_PROJECT_LINK_FORBIDDEN", HttpStatus.FORBIDDEN,
+                "업무 요청자, 담당자 또는 팀장만 프로젝트 연결을 변경할 수 있습니다.");
+        if (Boolean.TRUE.equals(request.clearProjectLink())) task.linkProject(null, null);
+        else {
+            ProjectLink link = projectLink(task.getGroup().getId(), request.projectId(), request.projectTopicId());
+            task.linkProject(link.project(), link.topic());
+        }
+        tasks.flush();
+        activity.record(task, actor, TaskActivityEvent.Type.DETAILS_CHANGED);
+        return response(task);
     }
 
     @Transactional(readOnly = true)

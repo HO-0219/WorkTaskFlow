@@ -75,6 +75,12 @@ public final class TaskDtos {
         }
     }
 
+    public record LinkProjectRequest(
+            @Positive Long projectId,
+            @Positive Long projectTopicId,
+            Boolean clearProjectLink,
+            @NotNull @PositiveOrZero Long expectedVersion) {}
+
     public record TaskHistoryResponse(
             Long id, String fromStatus, String toStatus, Long changedByMemberId,
             String reason, LocalDateTime createdAt) {}

@@ -221,6 +221,14 @@ export function TaskDetailPage() {
     }
   }
 
+  async function updateProjectLink() {
+    if (!task) return; setPending(true); setError('');
+    try {
+      const updated=await taskApi.linkProject(task.id,{projectId:editProjectId?Number(editProjectId):undefined,projectTopicId:editTopicId?Number(editTopicId):undefined,clearProjectLink:!editProjectId,expectedVersion:task.version});
+      setTask(updated); syncEditFields(updated);
+    } catch(caught){setError(errorMessage(caught));} finally{setPending(false);}
+  }
+
   async function deleteTask() {
     if (!task || !window.confirm(t('이 완료 업무를 삭제할까요? 목록과 대시보드에서는 사라지지만 감사 이력은 보존됩니다.', 'Delete this completed task? It will disappear from lists and dashboards, while audit history is retained.'))) return;
     setPending(true); setError('');
@@ -371,6 +379,7 @@ export function TaskDetailPage() {
       <TaskWorkflow status={task.status} />
       {isTerminal(task.status) && <aside className="task-record-lock"><strong>{t('완료 기록은 보호됩니다.', 'Completion history is protected.')}</strong><p>{task.status === 'COMPLETED' ? t('제목과 설명, 프로젝트 연결은 정정할 수 있습니다. 담당자·체크리스트·상태 이력은 완료 당시 기록으로 유지됩니다.', 'You can correct task details and project links. Ownership, checklist, and status history remain as recorded at completion.') : t('반려되거나 취소된 업무는 수정할 수 없습니다.', 'Rejected or cancelled tasks cannot be edited.')}</p></aside>}
       <p className="task-description">{task.description || t('등록된 설명이 없습니다.', 'No description provided.')}</p>
+      {group?.type==='TEAM'&&['TODO','IN_PROGRESS','ON_HOLD'].includes(task.status)&&(group.role==='LEADER'||group.memberId===task.requesterMemberId||group.memberId===task.assigneeMemberId)&&<section className="task-edit-section task-link-editor"><div><strong>{t('프로젝트 연결','Project connection')}</strong><small>{t('프로젝트 밖에서 만든 업무도 진행 중에 프로젝트 또는 주제로 옮길 수 있습니다.','Move standalone work into a project or topic while it is active.')}</small></div><div className="task-project-fields"><label className="field"><span>{t('프로젝트','Project')}</span><select value={editProjectId} onChange={e=>{setEditProjectId(e.target.value);setEditTopicId('');}}><option value="">{t('프로젝트 연결 안 함','No project')}</option>{projects.map(project=><option value={project.id} key={project.id}>{project.name}</option>)}</select></label><label className="field"><span>{t('주제','Topic')}</span><select value={editTopicId} disabled={!editProjectId} onChange={e=>setEditTopicId(e.target.value)}><option value="">{t('프로젝트에만 연결','Project only')}</option>{topics.map(topic=><option value={topic.id} key={topic.id}>{topic.title}</option>)}</select></label></div><button className="secondary" type="button" disabled={pending} onClick={updateProjectLink}>{t('연결 저장','Save connection')}</button></section>}
       {canEdit(task, group) && <section className="task-edit-section">{editing ? <form className="form task-edit-form" onSubmit={update}>
         {group?.type === 'TEAM' && <div className="task-project-fields"><label className="field"><span>{t('프로젝트', 'Project')}</span><select value={editProjectId} onChange={(event) => { setEditProjectId(event.target.value); setEditTopicId(''); }}><option value="">{t('프로젝트 연결 안 함', 'No project')}</option>{projects.map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label><label className="field"><span>{t('주제', 'Topic')}</span><select value={editTopicId} disabled={!editProjectId} onChange={(event) => setEditTopicId(event.target.value)}><option value="">{t('주제 선택 안 함', 'No topic')}</option>{topics.map((topic) => <option value={topic.id} key={topic.id}>{topic.title}</option>)}</select></label></div>}
         <label className="field"><span>{t('제목', 'Title')}</span><input required maxLength={120} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
@@ -576,8 +585,9 @@ function isTerminal(status: TaskResponse['status']) {
 function canEdit(task: TaskResponse, group?: GroupResponse) {
   if (!group || task.status === 'REJECTED' || task.status === 'CANCELLED') return false;
   if (group.type === 'PERSONAL') return true;
-  return group.role === 'LEADER' || task.requesterMemberId === group.memberId
-    || task.assigneeMemberId === group.memberId;
+  return (task.status === 'REQUESTED' || task.status === 'COMPLETED')
+    && (group.role === 'LEADER' || task.requesterMemberId === group.memberId
+      || task.assigneeMemberId === group.memberId);
 }
 
 function canWriteChecklist(task: TaskResponse, group?: GroupResponse) {

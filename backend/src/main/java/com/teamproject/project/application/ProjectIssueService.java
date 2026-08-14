@@ -84,8 +84,7 @@ public class ProjectIssueService {
                 : issues.countByProjectIdAndParentIdAndArchivedAtIsNull(projectId, parent.getId());
         if (siblingCount >= MAX_NODES_PER_PARENT) throw new ApplicationException(
                 "PROJECT_ISSUE_LIMIT", HttpStatus.CONFLICT, "한 분류에는 최대 100개의 항목을 만들 수 있습니다.");
-        GroupMember assignee = level == ProjectIssue.Level.ISSUE
-                ? optionalMember(project, request.assigneeMemberId()) : null;
+        GroupMember assignee = optionalMember(project, request.assigneeMemberId());
         ProjectIssue saved = issues.saveAndFlush(new ProjectIssue(project, parent, assignee, actor, level,
                 request.title().trim(), blankToNull(request.description()),
                 request.sortOrder() == null ? siblingCount : request.sortOrder(), request.dueDate()));
@@ -97,8 +96,7 @@ public class ProjectIssueService {
         ProjectIssue issue = issue(issueId);
         GroupMember actor = authorization.requireActiveMember(issue.getProject().getGroup().getId(), userId);
         requireMutable(issue.getProject()); requireManage(issue, actor); requireVersion(issue, request.expectedVersion());
-        GroupMember assignee = issue.getLevel() == ProjectIssue.Level.ISSUE
-                ? optionalMember(issue.getProject(), request.assigneeMemberId()) : null;
+        GroupMember assignee = optionalMember(issue.getProject(), request.assigneeMemberId());
         ProjectIssue.Status status = issue.getLevel() == ProjectIssue.Level.ISSUE
                 ? status(request.status()) : ProjectIssue.Status.OPEN;
         issue.update(request.title().trim(), blankToNull(request.description()), assignee, status,
@@ -217,9 +215,8 @@ public class ProjectIssueService {
         if (actor.getRole() == GroupMember.Role.LEADER) return true;
         Project project = issue.getProject();
         if (project.getLead() != null && project.getLead().getId().equals(actor.getId())) return true;
-        return issue.getLevel() == ProjectIssue.Level.ISSUE &&
-                (issue.getCreatedBy().getId().equals(actor.getId()) ||
-                        issue.getAssignee() != null && issue.getAssignee().getId().equals(actor.getId()));
+        return issue.getCreatedBy().getId().equals(actor.getId())
+                || issue.getAssignee() != null && issue.getAssignee().getId().equals(actor.getId());
     }
     private void requireStructureManager(Project project, GroupMember actor) {
         boolean lead = project.getLead() != null && project.getLead().getId().equals(actor.getId());

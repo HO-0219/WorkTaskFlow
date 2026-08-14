@@ -49,9 +49,11 @@ export function ProjectFlowPage() {
   }, [projectId]);
 
   const children = useMemo(() => {
-    const values = new Map<number | undefined, ProjectIssue[]>();
+    // API의 루트 parentId는 JSON에서 null이다. undefined로 조회하면 저장된 주제가 있어도
+    // 빈 상태가 계속 노출되므로 루트 키를 null로 통일한다.
+    const values = new Map<number | null, ProjectIssue[]>();
     nodes.filter((node) => !node.archivedAt)
-      .forEach((node) => values.set(node.parentId, [...(values.get(node.parentId) ?? []), node]));
+      .forEach((node) => { const parentId = node.parentId ?? null; values.set(parentId, [...(values.get(parentId) ?? []), node]); });
     return values;
   }, [nodes]);
 
@@ -136,7 +138,7 @@ export function ProjectFlowPage() {
     <header className="flow-header"><div><Link to={`/groups/${project.groupId}/projects`}>← {t('프로젝트 목록', 'Projects')}</Link>
       <span className="page-eyebrow">PROJECT WORKSPACE</span><h1>{project.name}</h1>
       <p>{t('프로젝트 안에서 주제를 나누고, 각 주제의 업무와 진행 상황을 한 흐름으로 관리합니다.', 'Organize topics, tasks, and progress in one project flow.')}</p></div>
-      {project.canManageFlow && <button className="primary" type="button" onClick={() => openCreate('MAJOR')}>＋ {t('주제 추가', 'Add topic')}</button>}
+      <div className="flow-header-actions"><Link className="secondary button-link" to={`/groups/${project.groupId}/tasks?projectId=${project.id}&create=1`}>＋ {t('프로젝트 업무', 'Project task')}</Link>{project.canManageFlow && <button className="primary" type="button" onClick={() => openCreate('MAJOR')}>＋ {t('주제 추가', 'Add topic')}</button>}</div>
     </header>
     {error && <p className="error">{error}</p>}
     <section className="flow-overview" aria-label={t('프로젝트 현황', 'Project overview')}>
@@ -146,9 +148,9 @@ export function ProjectFlowPage() {
       <div><span>{t('완료 업무', 'Completed')}</span><strong>{completedTasks.length}</strong></div>
     </section>
     <section className="project-health-strip"><div><span>{t('전체 진행률', 'Overall progress')}</span><strong>{completionRate}%</strong></div><progress value={completionRate} max={100} /><p>{tasks.length === 0 ? t('첫 업무를 연결하면 프로젝트 진행률이 표시됩니다.', 'Link the first task to start tracking project progress.') : t(`${tasks.length}개 업무 중 ${completedTasks.length}개를 완료했습니다.`, `${completedTasks.length} of ${tasks.length} tasks completed.`)}</p></section>
-    {(children.get(undefined) ?? []).length === 0 ? <section className="flow-empty"><h2>{t('첫 주제를 추가해 주세요', 'Add your first topic')}</h2><p>{t('예: 사용자 기능, 결제 시스템, 운영자 기능', 'Examples: User features, Payments, Admin features')}</p></section>
-      : <div className="flow-major-list">{(children.get(undefined) ?? []).map((major) => <section className="flow-major" key={major.id}>
-        <header><div><span>{t('주제', 'TOPIC')}</span><h2>{major.title}</h2>{major.description && <p>{major.description}</p>}</div>
+    {(children.get(null) ?? []).length === 0 ? <section className="flow-empty"><h2>{t('첫 주제를 추가해 주세요', 'Add your first topic')}</h2><p>{t('예: 사용자 기능, 결제 시스템, 운영자 기능', 'Examples: User features, Payments, Admin features')}</p></section>
+      : <div className="flow-major-list">{(children.get(null) ?? []).map((major) => <section className="flow-major" key={major.id}>
+        <header><div><span>{t('주제', 'TOPIC')}</span><h2>{major.title}</h2>{major.description && <p>{major.description}</p>}<small className="topic-owner">👤 {t('주제 담당', 'Topic owner')} · {major.assigneeNickname ?? t('미지정', 'Unassigned')}{major.dueDate ? ` · ${major.dueDate}` : ''}</small></div>
           <div className="flow-actions"><Link className="primary button-link" to={`/groups/${project.groupId}/tasks?projectId=${project.id}&topicId=${major.id}&create=1`}>＋ {t('업무 추가', 'Add task')}</Link>{major.canManage && <><button className="ghost" onClick={() => openEdit(major)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(major)}>{t('보관', 'Archive')}</button></>}</div></header>
         <ProjectTaskList title={t('이 주제의 업무', 'Tasks in this topic')} tasks={tasks.filter((task) => task.projectTopicId === major.id)} members={members} language={language} empty={t('아직 연결된 업무가 없습니다. 위 업무 추가를 누르면 이 주제가 자동 선택됩니다.', 'No tasks are linked yet. Add task will preselect this topic.')} />
         {(children.get(major.id) ?? []).length > 0 && <details className="legacy-project-details"><summary>{t(`기존 세부 내용 ${(children.get(major.id) ?? []).length}개`, `${(children.get(major.id) ?? []).length} legacy details`)}</summary><p>{t('기존에 등록한 내용과 실행 항목입니다. 새 업무는 위의 업무 추가를 이용해 주세요.', 'These are existing details and action items. Use Add task above for new work.')}</p><div className="flow-middle-list">{(children.get(major.id) ?? []).map((middle) => <section className="flow-middle" key={middle.id}>
@@ -179,9 +181,9 @@ export function ProjectFlowPage() {
     {editor && <Modal title={editor.value ? t('항목 수정', 'Edit item') : levelTitle(editor.level, language)} onClose={() => setEditor(undefined)}><form className="form modal-form project-editor-form" onSubmit={save}>
       <label className="field"><span>{t('주제', 'Title')}</span><input autoFocus required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label className="field"><span>{t('설명', 'Description')}</span><textarea maxLength={10000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
-      {editor.level === 'ISSUE' && <><label className="field"><span>{t('담당자', 'Assignee')}</span><select value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="">{t('미지정', 'Unassigned')}</option>{activeMembers.map((member) => <option key={member.id} value={member.id}>{member.nickname}</option>)}</select></label>
-        {editor.value && <label className="field"><span>{t('상태', 'Status')}</span><select value={status} onChange={(event) => setStatus(event.target.value as IssueStatus)}>{statuses.map(([value, ko, en]) => <option value={value} key={value}>{language === 'ko' ? ko : en}</option>)}</select></label>}
-        <label className="field"><span>{t('마감일', 'Due date')}</span><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label></>}
+      <label className="field"><span>{editor.level === 'MAJOR' ? t('주제 담당자', 'Topic owner') : t('담당자', 'Assignee')}</span><select value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="">{t('미지정', 'Unassigned')}</option>{activeMembers.map((member) => <option key={member.id} value={member.id}>{member.nickname}</option>)}</select></label>
+      {editor.level === 'ISSUE' && editor.value && <label className="field"><span>{t('상태', 'Status')}</span><select value={status} onChange={(event) => setStatus(event.target.value as IssueStatus)}>{statuses.map(([value, ko, en]) => <option value={value} key={value}>{language === 'ko' ? ko : en}</option>)}</select></label>}
+      <label className="field"><span>{t('마감일', 'Due date')}</span><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
       <div className="modal-actions"><button className="secondary" type="button" onClick={() => setEditor(undefined)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving}>{saving ? t('저장 중...', 'Saving...') : t('저장', 'Save')}</button></div>
     </form></Modal>}
   </main></>;
