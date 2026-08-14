@@ -137,7 +137,7 @@ function pageLabel(pathname: string, language: 'ko' | 'en') {
   if (/^\/groups\/\d+\/tasks$/.test(pathname)) return '업무 목록';
   if (/^\/groups\/\d+\/projects$/.test(pathname)) return '프로젝트 목록';
   if (/^\/groups\/\d+\/chat$/.test(pathname)) return '그룹 채팅';
-  if (/^\/projects\/\d+\/flow$/.test(pathname)) return '프로젝트 이슈 Flow';
+  if (/^\/projects\/\d+\/flow$/.test(pathname)) return '프로젝트 작업 내용';
   if (/^\/tasks\/\d+$/.test(pathname)) return '업무 상세';
   if (pathname === '/groups') return '그룹 목록';
   if (/^\/groups\/\d+$/.test(pathname)) return '그룹 상세';

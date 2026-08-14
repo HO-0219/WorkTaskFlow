@@ -77,7 +77,7 @@ export function ProjectFlowPage() {
     finally { setSaving(false); }
   }
   async function archive(node: ProjectIssue) {
-    const label = node.level === 'ISSUE' ? t('이슈', 'issue') : t('분류와 모든 하위 항목', 'category and all children');
+    const label = node.level === 'ISSUE' ? t('실행 항목', 'action item') : t('항목과 그 안의 모든 내용', 'item and all nested content');
     if (!window.confirm(t(`‘${node.title}’ ${label}을 보관할까요?`, `Archive “${node.title}” ${label}?`))) return;
     try { await projectIssueApi.archive(node.id, node.version); await load(); }
     catch (value) { setError(errorMessage(value)); }
@@ -117,7 +117,7 @@ export function ProjectFlowPage() {
   }
 
   if (!accessToken.get()) return <Navigate to="/login" replace />;
-  if (loading) return <main className="center-page">{t('프로젝트 Flow를 불러오는 중...', 'Loading project flow...')}</main>;
+  if (loading) return <main className="center-page">{t('프로젝트 작업 내용을 불러오는 중...', 'Loading project workspace...')}</main>;
   if (!project) return <Navigate to="/groups" replace />;
   const activeMembers = members.filter((member) => member.status === 'ACTIVE');
   const activeNodes = nodes.filter((node) => !node.archivedAt);
@@ -127,28 +127,28 @@ export function ProjectFlowPage() {
   };
   return <><AppNavigation /><main className="project-flow-page app-page">
     <header className="flow-header"><div><Link to={`/groups/${project.groupId}/projects`}>← {t('프로젝트 목록', 'Projects')}</Link>
-      <span className="page-eyebrow">ISSUE FLOW</span><h1>{project.name}</h1>
-      <p>{t('대분류에서 실제 작업 이슈와 체크리스트까지 한 흐름으로 관리합니다.', 'Manage categories, actionable issues, and checklists in one flow.')}</p></div>
-      {project.canManageFlow && <button className="primary" type="button" onClick={() => openCreate('MAJOR')}>＋ {t('대분류', 'Major category')}</button>}
+      <span className="page-eyebrow">PROJECT WORKSPACE</span><h1>{project.name}</h1>
+      <p>{t('프로젝트의 주제와 내용을 나누고, 실행 항목과 체크리스트까지 한 흐름으로 관리합니다.', 'Organize project topics and details, then manage action items and checklists in one flow.')}</p></div>
+      {project.canManageFlow && <button className="primary" type="button" onClick={() => openCreate('MAJOR')}>＋ {t('주제 추가', 'Add topic')}</button>}
     </header>
     {error && <p className="error">{error}</p>}
     <section className="flow-overview" aria-label={t('프로젝트 현황', 'Project overview')}>
-      <div><span>{t('대분류', 'Major')}</span><strong>{activeNodes.filter((node) => node.level === 'MAJOR').length}</strong></div>
-      <div><span>{t('중분류', 'Middle')}</span><strong>{activeNodes.filter((node) => node.level === 'MIDDLE').length}</strong></div>
-      <div><span>{t('실행 이슈', 'Issues')}</span><strong>{activeNodes.filter((node) => node.level === 'ISSUE').length}</strong></div>
+      <div><span>{t('주제', 'Topics')}</span><strong>{activeNodes.filter((node) => node.level === 'MAJOR').length}</strong></div>
+      <div><span>{t('내용', 'Details')}</span><strong>{activeNodes.filter((node) => node.level === 'MIDDLE').length}</strong></div>
+      <div><span>{t('실행 항목', 'Action items')}</span><strong>{activeNodes.filter((node) => node.level === 'ISSUE').length}</strong></div>
       <div><span>{t('완료', 'Done')}</span><strong>{activeNodes.filter((node) => node.level === 'ISSUE' && node.status === 'DONE').length}</strong></div>
     </section>
     <ProjectFileSystem project={project} nodes={nodes} />
-    {(children.get(undefined) ?? []).length === 0 ? <section className="flow-empty"><h2>{t('첫 대분류를 만들어 주세요', 'Create the first major category')}</h2><p>{t('예: 사용자 관련 개발, 결제 시스템, 운영자 기능', 'Examples: User development, Payments, Admin features')}</p></section>
+    {(children.get(undefined) ?? []).length === 0 ? <section className="flow-empty"><h2>{t('첫 주제를 추가해 주세요', 'Add your first topic')}</h2><p>{t('예: 사용자 기능, 결제 시스템, 운영자 기능', 'Examples: User features, Payments, Admin features')}</p></section>
       : <div className="flow-major-list">{(children.get(undefined) ?? []).map((major) => <section className="flow-major" key={major.id}>
-        <header><div><span>{t('대분류', 'MAJOR')}</span><h2>{major.title}</h2>{major.description && <p>{major.description}</p>}</div>
-          {major.canManage && <div className="flow-actions"><button className="secondary" onClick={() => openCreate('MIDDLE', major.id)}>＋ {t('중분류', 'Middle')}</button><button className="ghost" onClick={() => openEdit(major)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(major)}>{t('보관', 'Archive')}</button></div>}</header>
+        <header><div><span>{t('주제', 'TOPIC')}</span><h2>{major.title}</h2>{major.description && <p>{major.description}</p>}</div>
+          {major.canManage && <div className="flow-actions"><button className="secondary" onClick={() => openCreate('MIDDLE', major.id)}>＋ {t('내용 추가', 'Add detail')}</button><button className="ghost" onClick={() => openEdit(major)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(major)}>{t('보관', 'Archive')}</button></div>}</header>
         <div className="flow-middle-list">{(children.get(major.id) ?? []).map((middle) => <section className="flow-middle" key={middle.id}>
-          <header><div><span>{t('중분류', 'MIDDLE')}</span><h3>{middle.title}</h3></div><div className="flow-actions">
-            {project.status !== 'ARCHIVED' && <button className="secondary" onClick={() => openCreate('ISSUE', middle.id)}>＋ {t('소분류 이슈', 'Issue')}</button>}
+          <header><div><span>{t('내용', 'DETAIL')}</span><h3>{middle.title}</h3></div><div className="flow-actions">
+            {project.status !== 'ARCHIVED' && <button className="secondary" onClick={() => openCreate('ISSUE', middle.id)}>＋ {t('실행 항목', 'Action item')}</button>}
             {middle.canManage && <><button className="ghost" onClick={() => openEdit(middle)}>{t('수정', 'Edit')}</button><button className="ghost danger-text" onClick={() => archive(middle)}>{t('보관', 'Archive')}</button></>}
           </div></header>
-          {(children.get(middle.id) ?? []).length === 0 ? <p className="flow-inline-empty">{t('실행 이슈를 추가해 작업 순서를 만드세요.', 'Add an actionable issue to define the work.')}</p>
+          {(children.get(middle.id) ?? []).length === 0 ? <p className="flow-inline-empty">{t('실행 항목을 추가해 구체적인 작업을 정리하세요.', 'Add an action item to define the work.')}</p>
             : <div className="flow-issue-grid">{(children.get(middle.id) ?? []).map((issue) => <article className="flow-issue" key={issue.id}>
               <div className="flow-issue-heading"><span className={`issue-status issue-${issue.status.toLowerCase()}`}>{statusLabel(issue.status)}</span><small>#{issue.id}</small></div>
               <h4>{issue.title}</h4><p>{issue.description || t('상세 설명이 없습니다.', 'No description.')}</p>
@@ -162,11 +162,11 @@ export function ProjectFlowPage() {
         </section>)}</div>
       </section>)}</div>}
     {archivedNodes.length > 0 && <details className="archived-projects archived-issues"><summary>{t(`보관된 항목 ${archivedNodes.length}개`, `${archivedNodes.length} archived items`)}</summary>
-      <div className="archived-issue-list">{archivedNodes.map((node) => <article key={node.id}><div><strong>{node.title}</strong><small>{node.level} · {node.archivedAt ? new Date(node.archivedAt).toLocaleDateString() : ''}</small></div>
+      <div className="archived-issue-list">{archivedNodes.map((node) => <article key={node.id}><div><strong>{node.title}</strong><small>{levelLabel(node.level, language)} · {node.archivedAt ? new Date(node.archivedAt).toLocaleDateString() : ''}</small></div>
         {node.images.length > 0 && <div className="issue-images">{node.images.map((image) => <div key={image.id}><AuthenticatedIssueImage image={image} alt={image.originalFilename} />{image.canDelete && <button type="button" aria-label={t('이미지 삭제', 'Delete image')} onClick={() => deleteImage(node, image)}>×</button>}</div>)}</div>}</article>)}</div>
       <p>{t('보관된 위치의 파일과 링크는 위 파일 시스템에서 계속 조회하고 정리할 수 있습니다.', 'Files and links in archived locations remain available in the file system above.')}</p>
     </details>}
-    {editor && <Modal title={editor.value ? t('항목 수정', 'Edit item') : levelTitle(editor.level, language)} onClose={() => setEditor(undefined)}><form className="form modal-form" onSubmit={save}>
+    {editor && <Modal title={editor.value ? t('항목 수정', 'Edit item') : levelTitle(editor.level, language)} onClose={() => setEditor(undefined)}><form className="form modal-form project-editor-form" onSubmit={save}>
       <label className="field"><span>{t('주제', 'Title')}</span><input autoFocus required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label className="field"><span>{t('설명', 'Description')}</span><textarea maxLength={10000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       {editor.level === 'ISSUE' && <><label className="field"><span>{t('담당자', 'Assignee')}</span><select value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="">{t('미지정', 'Unassigned')}</option>{activeMembers.map((member) => <option key={member.id} value={member.id}>{member.nickname}</option>)}</select></label>
@@ -178,7 +178,12 @@ export function ProjectFlowPage() {
 }
 
 function levelTitle(level: IssueLevel, language: 'ko' | 'en') {
-  const values = { MAJOR: ['새 대분류', 'New major category'], MIDDLE: ['새 중분류', 'New middle category'], ISSUE: ['새 소분류 이슈', 'New issue'] } as const;
+  const values = { MAJOR: ['새 주제 추가', 'Add a new topic'], MIDDLE: ['새 내용 추가', 'Add new detail'], ISSUE: ['새 실행 항목', 'Add action item'] } as const;
+  return values[level][language === 'ko' ? 0 : 1];
+}
+
+function levelLabel(level: IssueLevel, language: 'ko' | 'en') {
+  const values = { MAJOR: ['주제', 'Topic'], MIDDLE: ['내용', 'Detail'], ISSUE: ['실행 항목', 'Action item'] } as const;
   return values[level][language === 'ko' ? 0 : 1];
 }
 

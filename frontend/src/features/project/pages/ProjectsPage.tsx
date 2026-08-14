@@ -84,8 +84,8 @@ export function ProjectsPage() {
   const label = (value: [string, string]) => value[language === 'ko' ? 0 : 1];
   return <><AppNavigation /><main className="projects-page app-page">
     <header className="projects-header"><div><Link to={`/groups/${groupId}`}>← {t('그룹으로', 'Back to group')}</Link>
-      <span className="page-eyebrow">PROJECT FLOW</span><h1>{group.name} {t('프로젝트', 'Projects')}</h1>
-      <p>{t('프로젝트를 만들고 다음 단계에서 대분류와 이슈를 연결합니다.', 'Create projects, then organize categories and issues in the next stage.')}</p></div>
+      <span className="page-eyebrow">PROJECTS</span><h1>{group.name} {t('프로젝트', 'Projects')}</h1>
+      <p>{t('프로젝트를 만든 뒤 주제, 내용, 실행 항목을 한 흐름으로 정리합니다.', 'Create a project, then organize topics, details, and action items in one flow.')}</p></div>
       {group.role === 'LEADER' && <button className="primary" type="button" onClick={openCreate}>＋ {t('프로젝트 만들기', 'Create project')}</button>}
     </header>
     {features && <section className="project-plan-summary">
@@ -102,12 +102,12 @@ export function ProjectsPage() {
           <h2><Link to={`/projects/${project.id}/flow`}>{project.name}</Link></h2><p>{project.description || t('프로젝트 설명이 없습니다.', 'No project description.')}</p>
           <dl><div><dt>{t('담당 리더', 'Project lead')}</dt><dd>{project.leadNickname ?? t('미지정', 'Unassigned')}</dd></div>
             <div><dt>{t('기간', 'Schedule')}</dt><dd>{project.startDate ?? '—'} ~ {project.dueDate ?? '—'}</dd></div></dl>
-          <div className="project-card-actions"><Link className="primary button-link" to={`/projects/${project.id}/flow`}>{t('Flow 열기', 'Open flow')}</Link>{project.canManage && <><button className="secondary" type="button" onClick={() => openEdit(project)}>{t('수정', 'Edit')}</button><button className="danger" type="button" onClick={() => archive(project)}>{t('보관', 'Archive')}</button></>}</div>
+          <div className="project-card-actions"><Link className="primary button-link" to={`/projects/${project.id}/flow`}>{t('작업 내용 열기', 'Open workspace')}</Link>{project.canManage && <><button className="secondary" type="button" onClick={() => openEdit(project)}>{t('수정', 'Edit')}</button><button className="danger" type="button" onClick={() => archive(project)}>{t('보관', 'Archive')}</button></>}</div>
         </article>)}</div>}
     </section>
     {archived.length > 0 && <details className="archived-projects"><summary>{t(`보관된 프로젝트 ${archived.length}개`, `${archived.length} archived projects`)}</summary><ul>{archived.map((project) => <li key={project.id}><Link to={`/projects/${project.id}/flow`}>{project.name}</Link></li>)}</ul></details>}
     {showForm && <Modal title={editing ? t('프로젝트 수정', 'Edit project') : t('새 프로젝트', 'New project')} onClose={() => setShowForm(false)}>
-      <form className="form modal-form" onSubmit={save}>
+      <form className="form modal-form project-editor-form" onSubmit={save}>
         <label className="field"><span>{t('프로젝트 이름', 'Project name')}</span><input autoFocus required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="field"><span>{t('설명', 'Description')}</span><textarea maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
         <label className="field"><span>{t('프로젝트 리더', 'Project lead')}</span><select value={leadMemberId} onChange={(event) => setLeadMemberId(event.target.value)}><option value="">{t('미지정', 'Unassigned')}</option>{members.filter((member) => member.status === 'ACTIVE').map((member) => <option value={member.id} key={member.id}>{member.nickname}</option>)}</select></label>

@@ -14,6 +14,7 @@ type GroupChannels = { group: GroupResponse; channels: ChatChannel[] };
 export function ChatHubPage() {
   const { t } = useLanguage();
   const [groups, setGroups] = useState<GroupChannels[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -22,21 +23,21 @@ export function ChatHubPage() {
     groupApi.list().then((values) => Promise.all(values.filter((group) => group.type === 'TEAM').map(async (group) => ({
       group,
       channels: await chatApi.channels(group.id),
-    })))).then((values) => { if (active) setGroups(values); })
+    })))).then((values) => { if (active) { setGroups(values); setSelectedGroupId((current) => current ?? values[0]?.group.id); } })
       .catch((value) => { if (active) setError(errorMessage(value)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
   if (!accessToken.get()) return <Navigate to="/login" replace />;
-  return <><AppNavigation /><main className="chat-hub-page app-page">
-    <header className="chat-hub-header"><div><span className="page-eyebrow">TEAM CHAT</span><h1>{t('채팅', 'Chat')}</h1><p>{t('그룹을 고른 다음, 이어서 대화할 채팅방을 선택하세요.', 'Choose a group, then select the channel you want to continue.')}</p></div><Link className="secondary" to="/groups">{t('그룹 관리', 'Manage groups')}</Link></header>
+  const selected = groups.find(({ group }) => group.id === selectedGroupId) ?? groups[0];
+  return <><AppNavigation /><main className="chat-page chat-hub-page app-page">
+    <header className="chat-page-header"><div><span className="page-eyebrow">TEAM CHAT</span><h1>{t('채팅', 'Chat')}</h1><p>{t('왼쪽에서 그룹과 채팅방을 차례로 선택하세요.', 'Choose a group and channel from the left.')}</p></div></header>
     {error && <p className="error">{error}</p>}
     {loading ? <p className="muted">{t('채팅방을 불러오는 중...', 'Loading channels...')}</p> : groups.length === 0 ? <section className="chat-hub-empty"><h2>{t('참여 중인 팀 그룹이 없습니다.', 'You are not in a team group yet.')}</h2><p>{t('그룹을 만들거나 초대받은 그룹에 참여하면 여기에서 채팅을 시작할 수 있습니다.', 'Create or join a group to start chatting here.')}</p><Link className="primary button-link" to="/groups">{t('그룹 시작하기', 'Get started with groups')}</Link></section>
-      : <section className="chat-group-grid" aria-label={t('그룹별 채팅방', 'Channels by group')}>{groups.map(({ group, channels }, index) => <article className="chat-group-card" key={group.id}>
-        <header><span className={`chat-group-avatar chat-group-avatar-${index % 4}`}>{group.imageUrl ? <AuthenticatedImage src={group.imageUrl} alt="" /> : group.name.trim().charAt(0).toUpperCase()}</span><div><h2>{group.name}</h2><p>{t(`${channels.length}개 채팅방`, `${channels.length} channels`)}</p></div><Link to={`/groups/${group.id}/dashboard`}>{t('대시보드', 'Dashboard')} →</Link></header>
-        <div className="chat-hub-channel-list">{channels.length === 0 ? <p>{t('사용할 수 있는 채팅방이 없습니다.', 'No channels are available.')}</p> : channels.map((channel) => <Link key={channel.id} to={`/groups/${group.id}/chat?channel=${channel.id}`}><span aria-hidden="true">{channel.type === 'GENERAL' ? '●' : '#'}</span><span><strong>{channel.name}</strong><small>{channel.issueNodeTitle ?? channel.projectName ?? t('그룹 전체', 'Whole group')}</small></span><b aria-hidden="true">›</b></Link>)}</div>
-      </article>)}</section>}
+      : <div className="chat-layout chat-browser-layout"><aside className="chat-group-rail" aria-label={t('채팅 그룹', 'Chat groups')}><Link className="chat-rail-home" to="/app" aria-label={t('홈', 'Home')}>⌂</Link><div />{groups.map(({ group }, index) => <button className={group.id === selectedGroupId ? 'selected' : ''} type="button" key={group.id} onClick={() => setSelectedGroupId(group.id)} title={group.name}><span className={`chat-group-avatar chat-group-avatar-${index % 4}`}>{group.imageUrl ? <AuthenticatedImage src={group.imageUrl} alt="" /> : group.name.trim().charAt(0).toUpperCase()}</span><small>{group.name}</small></button>)}</aside>
+        <aside className="chat-channels chat-browser-channels"><header><div><small>{t('선택한 그룹', 'Selected group')}</small><h2>{selected?.group.name}</h2></div><Link to={`/groups/${selected?.group.id}/dashboard`} aria-label={t('그룹 대시보드', 'Group dashboard')}>⌂</Link></header><div className="chat-channel-heading">{t('채팅방', 'Channels')} <span>{selected?.channels.length ?? 0}</span></div>{selected?.channels.map((channel) => <Link className="chat-channel-link" key={channel.id} to={`/groups/${selected.group.id}/chat?channel=${channel.id}`}><span>{channel.type === 'GENERAL' ? '●' : '#'}</span><span><strong>{channel.name}</strong><small>{channel.issueNodeTitle ?? channel.projectName ?? t('그룹 전체', 'Whole group')}</small></span></Link>)}</aside>
+        <section className="chat-browser-welcome"><span aria-hidden="true">#</span><h2>{t('채팅방을 선택해 주세요', 'Choose a channel')}</h2><p>{t('채팅 기록은 선택한 채팅방에서만 표시됩니다.', 'Messages appear only after you choose a channel.')}</p></section></div>}
   </main></>;
 }
 
@@ -58,6 +59,7 @@ export function ChatPage() {
   const [showChannel, setShowChannel] = useState(false);
   const [channelName, setChannelName] = useState('');
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
+  const [teamGroups, setTeamGroups] = useState<GroupResponse[]>([]);
   const [members, setMembers] = useState<MemberResponse[]>([]);
   const [projectId, setProjectId] = useState('');
   const [majorIssues, setMajorIssues] = useState<ProjectIssue[]>([]);
@@ -74,9 +76,10 @@ export function ChatPage() {
 
   useEffect(() => {
     if (!Number.isInteger(groupId) || groupId < 1) { setLoading(false); return; }
-    Promise.all([groupApi.get(groupId), groupApi.features(groupId), chatApi.channels(groupId), projectApi.list(groupId), groupApi.members(groupId)])
-      .then(([groupValue, featureValue, channelValues, projectValues, memberValues]) => {
+    Promise.all([groupApi.get(groupId), groupApi.features(groupId), chatApi.channels(groupId), projectApi.list(groupId), groupApi.members(groupId), groupApi.list()])
+      .then(([groupValue, featureValue, channelValues, projectValues, memberValues, groupValues]) => {
         setGroup(groupValue); setFeatures(featureValue); setChannels(channelValues); setProjects(projectValues);
+        setTeamGroups(groupValues.filter((value) => value.type === 'TEAM'));
         setMembers(memberValues.filter((member) => member.status === 'ACTIVE'));
         const requestedChannelId = Number(channelParam);
         setSelectedId(channelValues.some((channel) => channel.id === requestedChannelId) ? requestedChannelId : channelValues[0]?.id);
@@ -199,7 +202,7 @@ export function ChatPage() {
   return <><AppNavigation /><main className="chat-page app-page">
     <header className="chat-page-header"><div><Link to={`/groups/${groupId}/dashboard`}>← {t('그룹 대시보드', 'Group dashboard')}</Link><h1>{t('팀 채팅', 'Team chat')}</h1><p>{t(`${group.name} 팀의 업무 대화와 자료를 한곳에서 나누세요.`, `Discuss work and share files with ${group.name} in one place.`)}</p></div></header>
     {error && <p className="error">{error}</p>}
-    <div className="chat-layout"><aside className="chat-channels"><header><div><Link className="chat-group-picker-link" to="/chat">{t('그룹 선택', 'Choose group')}</Link><h2>{group.name}</h2></div>{features?.multipleChatChannels && (group.role === 'LEADER' || projects.some((project) => project.canManageFlow)) && <button type="button" onClick={() => { setChannelName(''); setProjectId(''); setMajorId(''); setShowChannel(true); }}>＋</button>}</header>
+    <div className="chat-layout"><GroupRail groups={teamGroups} currentGroupId={groupId} /><aside className="chat-channels"><header><div><Link className="chat-group-picker-link" to="/chat">{t('모든 그룹', 'All groups')}</Link><h2>{group.name}</h2></div>{features?.multipleChatChannels && (group.role === 'LEADER' || projects.some((project) => project.canManageFlow)) && <button type="button" onClick={() => { setChannelName(''); setProjectId(''); setMajorId(''); setShowChannel(true); }}>＋</button>}</header>
       {channels.map((channel) => <button className={selectedId === channel.id ? 'selected' : ''} key={channel.id} onClick={() => selectChannel(channel.id)}><span>{channel.type === 'GENERAL' ? '●' : '#'}</span><div><strong>{channel.name}</strong><small>{channel.issueNodeTitle ?? channel.projectName ?? t('그룹 전체', 'Whole group')}</small></div></button>)}
       {!features?.multipleChatChannels && <p>{t('무료 그룹은 공용 채팅방 1개를 사용합니다.', 'Free groups use one shared channel.')}</p>}
     </aside><section className="chat-room"><header><div><h2>{selected?.name ?? t('채팅방', 'Channel')}</h2><p>{selected?.issueNodeTitle ?? selected?.projectName ?? t('모든 팀원이 참여하는 그룹 공용 대화', 'A group conversation for every teammate')}</p></div><Link className="chat-member-link" to={`/groups/${groupId}/members`}>♙ {t(`${members.length}명`, `${members.length} members`)}</Link></header>
@@ -208,8 +211,13 @@ export function ChatPage() {
         {messages.map((message) => <article className="chat-message" key={message.id}><div className="chat-avatar">{message.senderProfileImageUrl ? <AuthenticatedImage src={message.senderProfileImageUrl} alt="" /> : message.senderNickname.slice(0, 1)}</div><div><header><strong>{message.senderNickname}</strong><time>{formatTime(message.createdAt, language)}</time></header>{message.content && <p>{message.content}</p>}{message.type === 'IMAGE' && <ChatImage message={message} />}{message.type === 'FILE' && <button className="chat-file" onClick={() => chatApi.download(message).catch((value) => setError(errorMessage(value)))}>▤ <span>{message.originalFilename}</span><small>{formatBytes(message.sizeBytes ?? 0)}</small></button>}</div></article>)}<div ref={messageEnd} />
       </div><form className={`chat-composer ${attachment ? 'has-attachment' : ''}`} onSubmit={send}>{attachment && <AttachmentPreview file={attachment} uploading={uploading} onRemove={() => setAttachment(undefined)} />}<label className={`chat-attach ${attachment ? 'selected' : ''}`} title={t('파일 또는 이미지 첨부', 'Attach a file or image')}>＋<input type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.txt,.csv,.docx,.xlsx,.pptx,.zip" onChange={chooseAttachment} /></label><textarea rows={1} maxLength={4000} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={attachment ? t('첨부 파일에 설명을 추가하세요 (선택)', 'Add a caption (optional)') : t('메시지를 입력하세요', 'Type a message')} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><button type="submit" className="primary chat-send-button" disabled={uploading || (!draft.trim() && !attachment)}>{uploading ? t('올리는 중...', 'Uploading...') : t('전송', 'Send')}</button></form>
     </section></div>
-    {showChannel && <Modal title={t('새 채팅방', 'New channel')} onClose={() => setShowChannel(false)}><form className="form modal-form" onSubmit={createChannel}><label className="field"><span>{t('채팅방 이름', 'Channel name')}</span><input autoFocus required maxLength={80} value={channelName} onChange={(event) => setChannelName(event.target.value)} /></label><label className="field"><span>{t('프로젝트', 'Project')}</span><select required={group.role !== 'LEADER'} value={projectId} onChange={(event) => { setProjectId(event.target.value); setMajorId(''); }}>{group.role === 'LEADER' && <option value="">{t('그룹 전체', 'Whole group')}</option>}{group.role !== 'LEADER' && <option value="">{t('프로젝트 선택', 'Select a project')}</option>}{channelProjects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{projectId && <label className="field"><span>{t('대주제', 'Major topic')}</span><select value={majorId} onChange={(event) => setMajorId(event.target.value)}><option value="">{t('프로젝트 전체', 'Whole project')}</option>{majorIssues.map((issue) => <option key={issue.id} value={issue.id}>{issue.title}</option>)}</select></label>}<div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowChannel(false)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving}>{saving ? t('만드는 중...', 'Creating...') : t('만들기', 'Create')}</button></div></form></Modal>}
+    {showChannel && <Modal title={t('새 채팅방', 'New channel')} onClose={() => setShowChannel(false)}><form className="form modal-form" onSubmit={createChannel}><label className="field"><span>{t('채팅방 이름', 'Channel name')}</span><input autoFocus required maxLength={80} value={channelName} onChange={(event) => setChannelName(event.target.value)} /></label><label className="field"><span>{t('프로젝트', 'Project')}</span><select required={group.role !== 'LEADER'} value={projectId} onChange={(event) => { setProjectId(event.target.value); setMajorId(''); }}>{group.role === 'LEADER' && <option value="">{t('그룹 전체', 'Whole group')}</option>}{group.role !== 'LEADER' && <option value="">{t('프로젝트 선택', 'Select a project')}</option>}{channelProjects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{projectId && <label className="field"><span>{t('연결할 주제', 'Related topic')}</span><select value={majorId} onChange={(event) => setMajorId(event.target.value)}><option value="">{t('프로젝트 전체', 'Whole project')}</option>{majorIssues.map((issue) => <option key={issue.id} value={issue.id}>{issue.title}</option>)}</select></label>}<div className="modal-actions"><button className="secondary" type="button" onClick={() => setShowChannel(false)}>{t('취소', 'Cancel')}</button><button className="primary" disabled={saving}>{saving ? t('만드는 중...', 'Creating...') : t('만들기', 'Create')}</button></div></form></Modal>}
   </main></>;
+}
+
+function GroupRail({ groups, currentGroupId }: { groups: GroupResponse[]; currentGroupId: number }) {
+  const { t } = useLanguage();
+  return <aside className="chat-group-rail" aria-label={t('채팅 그룹', 'Chat groups')}><Link className="chat-rail-home" to="/chat" aria-label={t('모든 채팅 그룹', 'All chat groups')}>◌</Link><div />{groups.map((group, index) => <Link className={group.id === currentGroupId ? 'selected' : ''} to={`/groups/${group.id}/chat`} key={group.id} aria-label={group.name} title={group.name}><span className={`chat-group-avatar chat-group-avatar-${index % 4}`}>{group.imageUrl ? <AuthenticatedImage src={group.imageUrl} alt="" /> : group.name.trim().charAt(0).toUpperCase()}</span><small>{group.name}</small></Link>)}</aside>;
 }
 
 function ChatImage({ message }: { message: ChatMessage }) {

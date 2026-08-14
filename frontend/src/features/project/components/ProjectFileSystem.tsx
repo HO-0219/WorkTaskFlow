@@ -46,7 +46,7 @@ export function ProjectFileSystem({ project, nodes }: { project: ProjectResponse
   const percent = data?.limitBytes ? Math.min(100, Math.round(data.usedBytes * 100 / data.limitBytes)) : 0;
   return <section className="project-files">
     <header><div><span className="page-eyebrow">PROJECT FILES</span><h2>{t('프로젝트 파일 시스템', 'Project file system')}</h2>
-      <p>{t('Flow의 각 단계가 폴더가 됩니다. 선택한 위치에 파일과 링크를 보관하세요.', 'Each flow level is a folder. Store files and links in the selected location.')}</p></div>
+      <p>{t('주제, 내용, 실행 항목이 폴더처럼 정리됩니다. 선택한 위치에 파일과 링크를 보관하세요.', 'Topics, details, and action items become folders for files and links.')}</p></div>
       <div className="storage-meter"><div><span>{formatBytes(data?.usedBytes ?? 0)} / {formatBytes(data?.limitBytes ?? 0)}</span><strong>{percent}%</strong></div><progress max={100} value={percent} /></div>
     </header>
     {error && <p className="error">{error}</p>}
@@ -90,7 +90,7 @@ function FolderBranch({ node, childrenMap, selectedId, onSelect }: {
   return <div className={`folder-branch level-${node.level.toLowerCase()}${node.archivedAt ? ' archived' : ''}`}><button className={selectedId === node.id ? 'selected' : ''} onClick={() => onSelect(node.id)}>{node.level === 'ISSUE' ? '📄' : '📁'} {node.title}{node.archivedAt ? ' · 보관됨' : ''}</button>{(childrenMap.get(node.id) ?? []).map((child) => <FolderBranch key={child.id} node={child} childrenMap={childrenMap} selectedId={selectedId} onSelect={onSelect} />)}</div>;
 }
 function levelLabel(level: ProjectIssue['level'], language: 'ko' | 'en') {
-  const labels = { MAJOR: ['대분류', 'Major'], MIDDLE: ['중분류', 'Middle'], ISSUE: ['소분류', 'Issue'] };
+  const labels = { MAJOR: ['주제', 'Topic'], MIDDLE: ['내용', 'Detail'], ISSUE: ['실행 항목', 'Action item'] };
   return labels[level][language === 'ko' ? 0 : 1];
 }
 function formatBytes(value: number) {
