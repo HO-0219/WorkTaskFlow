@@ -47,6 +47,15 @@ public class AiDocumentIndexService {
 
     public IndexResponse reindex(Long userId, Long groupId) {
         authorization.requireActiveMember(groupId, userId);
+        return reindexGroup(groupId);
+    }
+
+    /**
+     * 사용자 없이 그룹만으로 재색인한다. {@link AiDocumentAutoIndexRetryScheduler} 가 자동색인
+     * 실패(네트워크 오류 등 일시적 문제) 를 주기적으로 다시 시도할 때 쓴다 — 실패한 자료는 이미
+     * 청크가 없어 "색인 안 됨" 상태 그대로이므로, 이 메서드를 다시 부르면 자연히 재시도된다.
+     */
+    public IndexResponse reindexGroup(Long groupId) {
         String modelId = embeddings.modelId();
         List<Candidate> candidates = store.candidates(groupId);
         // 모델이 바뀌기 전 자료를 지웠는지 판단하려면 모델과 무관하게 "색인된 적 있음"이 필요하다.
