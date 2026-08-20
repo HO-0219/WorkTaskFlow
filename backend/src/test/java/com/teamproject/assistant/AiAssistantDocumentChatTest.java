@@ -53,6 +53,7 @@ class AiAssistantDocumentChatTest {
 
     @BeforeEach
     void stubEmbeddings() {
+        Mockito.when(embeddings.modelId()).thenReturn("test-embedding-model");
         Mockito.when(embeddings.embed(Mockito.anyList())).thenAnswer(invocation -> {
             List<String> texts = invocation.getArgument(0);
             return texts.stream().map(text -> new float[] {1f, 0.5f}).toList();

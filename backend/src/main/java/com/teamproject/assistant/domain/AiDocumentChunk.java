@@ -26,12 +26,13 @@ public class AiDocumentChunk {
     @Column(nullable = false, columnDefinition = "text") private String content;
     @Column(nullable = false, columnDefinition = "longblob") private byte[] embedding;
     @Column(nullable = false) private int dimensions;
+    @Column(name = "embedding_model", nullable = false, length = 120) private String embeddingModel;
     @Column(nullable = false, updatable = false) private LocalDateTime createdAt;
 
     protected AiDocumentChunk() {}
 
     public AiDocumentChunk(Group group, GroupResource resource, int chunkIndex, String title,
-            String filename, String content, float[] embedding) {
+            String filename, String content, float[] embedding, String embeddingModel) {
         this.group = group;
         this.resource = resource;
         this.chunkIndex = chunkIndex;
@@ -40,6 +41,7 @@ public class AiDocumentChunk {
         this.content = content;
         this.embedding = pack(embedding);
         this.dimensions = embedding.length;
+        this.embeddingModel = embeddingModel;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -62,5 +64,6 @@ public class AiDocumentChunk {
     public String getFilename() { return filename; }
     public String getContent() { return content; }
     public int getDimensions() { return dimensions; }
+    public String getEmbeddingModel() { return embeddingModel; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

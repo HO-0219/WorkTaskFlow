@@ -42,6 +42,7 @@ class AiDocumentRagTest {
 
     @BeforeEach
     void stubEmbeddings() {
+        Mockito.when(embeddings.modelId()).thenReturn("test-embedding-model");
         Mockito.when(embeddings.embed(Mockito.anyList())).thenAnswer(invocation -> {
             List<String> texts = invocation.getArgument(0);
             return texts.stream().map(AiDocumentRagTest::vector).toList();
@@ -148,6 +149,39 @@ class AiDocumentRagTest {
 
         assertThat(result.removed()).isEqualTo(1);
         assertThat(searchService.search(fixture.groupId(), "금요일 배포 규칙", 5)).isEmpty();
+    }
+
+    @Test
+    void excludesADeletedResourceFromSearchBeforeTheNextReindex() {
+        Fixture fixture = fixture();
+        Long resourceId = upload(fixture, "배포 절차서", "배포.txt", "금요일에는 배포하지 않는다.");
+        indexService.reindex(fixture.userId(), fixture.groupId());
+        assertThat(searchService.search(fixture.groupId(), "금요일 배포 규칙", 5)).isNotEmpty();
+
+        resources.delete(fixture.userId(), resourceId);
+
+        // 재색인을 아직 안 돌렸어도 삭제된 자료의 청크는 검색에 나오면 안 된다.
+        assertThat(searchService.search(fixture.groupId(), "금요일 배포 규칙", 5)).isEmpty();
+    }
+
+    @Test
+    void reindexesAResourceWhenTheEmbeddingModelChanges() {
+        Fixture fixture = fixture();
+        upload(fixture, "배포 절차서", "배포.txt", "금요일에는 배포하지 않는다.");
+        indexService.reindex(fixture.userId(), fixture.groupId());
+        assertThat(searchService.search(fixture.groupId(), "금요일 배포 규칙", 5)).isNotEmpty();
+
+        Mockito.when(embeddings.modelId()).thenReturn("new-embedding-model");
+
+        var result = indexService.reindex(fixture.userId(), fixture.groupId());
+
+        assertThat(result.indexed()).isEqualTo(1);
+        assertThat(result.skipped()).isZero();
+        // 새 모델로도 여전히 검색된다 — 옛 벡터가 섞여 남아 있지 않다는 뜻이다.
+        assertThat(searchService.search(fixture.groupId(), "금요일 배포 규칙", 5)).isNotEmpty();
+        var third = indexService.reindex(fixture.userId(), fixture.groupId());
+        assertThat(third.skipped()).isEqualTo(1);
+        assertThat(third.indexed()).isZero();
     }
 
     private static float[] vector(String text) {

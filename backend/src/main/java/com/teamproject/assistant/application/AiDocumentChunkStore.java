@@ -38,8 +38,15 @@ public class AiDocumentChunkStore {
     }
 
     @Transactional(readOnly = true)
-    public Set<Long> indexedResourceIds(Long groupId) {
+    public Set<Long> allIndexedResourceIds(Long groupId) {
         return Set.copyOf(chunks.findIndexedResourceIds(groupId));
+    }
+
+    /** 현재 임베딩 모델로 색인된 자료만 돌려준다. 모델을 바꾸면 옛 모델로 남은 자료는
+     * 여기서 빠져서 reindex() 가 재색인 대상으로 다시 잡는다. */
+    @Transactional(readOnly = true)
+    public Set<Long> upToDateResourceIds(Long groupId, String modelId) {
+        return Set.copyOf(chunks.findUpToDateResourceIds(groupId, modelId));
     }
 
     @Transactional(readOnly = true)
@@ -62,14 +69,17 @@ public class AiDocumentChunkStore {
     }
 
     @Transactional
-    public void save(Long groupId, Candidate candidate, List<String> pieces, List<float[]> vectors) {
+    public void save(Long groupId, Candidate candidate, List<String> pieces, List<float[]> vectors,
+            String modelId) {
         GroupResource resource = resources.findByIdAndDeletedAtIsNull(candidate.resourceId()).orElse(null);
         // 색인 도중 자료가 지워졌을 수 있다. 그러면 저장할 근거가 없으므로 조용히 건너뛴다.
         if (resource == null || !resource.getGroup().getId().equals(groupId)) return;
+        // 옛 모델로 남은 청크가 있으면 먼저 지운다 — 두 모델 벡터가 섞이면 코사인 비교가 무의미해진다.
+        chunks.deleteByResourceId(candidate.resourceId());
         List<AiDocumentChunk> rows = new ArrayList<>(pieces.size());
         for (int index = 0; index < pieces.size(); index++) {
             rows.add(new AiDocumentChunk(resource.getGroup(), resource, index, candidate.title(),
-                    candidate.filename(), pieces.get(index), vectors.get(index)));
+                    candidate.filename(), pieces.get(index), vectors.get(index), modelId));
         }
         chunks.saveAll(rows);
     }

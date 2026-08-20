@@ -47,8 +47,12 @@ public class AiDocumentIndexService {
 
     public IndexResponse reindex(Long userId, Long groupId) {
         authorization.requireActiveMember(groupId, userId);
+        String modelId = embeddings.modelId();
         List<Candidate> candidates = store.candidates(groupId);
-        Set<Long> indexed = store.indexedResourceIds(groupId);
+        // 모델이 바뀌기 전 자료를 지웠는지 판단하려면 모델과 무관하게 "색인된 적 있음"이 필요하다.
+        Set<Long> everIndexed = store.allIndexedResourceIds(groupId);
+        // 재색인을 건너뛸지는 지금 모델로 색인됐는지로만 판단한다 — 옛 모델로 남은 자료는 다시 잡는다.
+        Set<Long> upToDate = store.upToDateResourceIds(groupId, modelId);
         Set<Long> live = new HashSet<>();
         candidates.forEach(candidate -> live.add(candidate.resourceId()));
 
@@ -58,14 +62,14 @@ public class AiDocumentIndexService {
         int unsupported = 0;
         List<String> failures = new ArrayList<>();
 
-        for (Long stale : indexed) {
+        for (Long stale : everIndexed) {
             if (!live.contains(stale)) {
                 store.deleteResource(stale);
                 removed++;
             }
         }
         for (Candidate candidate : candidates) {
-            if (indexed.contains(candidate.resourceId())) {
+            if (upToDate.contains(candidate.resourceId())) {
                 skipped++;
                 continue;
             }
@@ -78,7 +82,7 @@ public class AiDocumentIndexService {
                 unsupported++;
                 continue;
             }
-            switch (tryIndex(groupId, candidate)) {
+            switch (tryIndex(groupId, candidate, modelId)) {
                 case ADDED -> added++;
                 case UNSUPPORTED -> unsupported++;
                 case FAILED -> failures.add(candidate.title());
@@ -98,10 +102,10 @@ public class AiDocumentIndexService {
         if (candidate == null || candidate.storageKey() == null || !extractor.supports(candidate.filename())) {
             return;
         }
-        tryIndex(groupId, candidate);
+        tryIndex(groupId, candidate, embeddings.modelId());
     }
 
-    private Outcome tryIndex(Long groupId, Candidate candidate) {
+    private Outcome tryIndex(Long groupId, Candidate candidate, String modelId) {
         List<String> pieces;
         try {
             byte[] content = storage.get(candidate.storageKey()).content();
@@ -113,7 +117,7 @@ public class AiDocumentIndexService {
         }
         if (pieces.isEmpty()) return Outcome.UNSUPPORTED;
         try {
-            store.save(groupId, candidate, pieces, embeddings.embed(pieces));
+            store.save(groupId, candidate, pieces, embeddings.embed(pieces), modelId);
             return Outcome.ADDED;
         } catch (RuntimeException exception) {
             log.warn("자료 {} 색인 실패: {}", candidate.resourceId(), exception.getClass().getSimpleName());

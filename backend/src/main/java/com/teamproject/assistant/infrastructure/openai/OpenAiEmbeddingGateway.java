@@ -27,6 +27,11 @@ public class OpenAiEmbeddingGateway implements EmbeddingGateway {
     }
 
     @Override
+    public String modelId() {
+        return properties.embeddingModel();
+    }
+
+    @Override
     public List<float[]> embed(List<String> texts) {
         if (texts.isEmpty()) return List.of();
         if (!properties.enabled() || !sharedProperties.hasApiKey()

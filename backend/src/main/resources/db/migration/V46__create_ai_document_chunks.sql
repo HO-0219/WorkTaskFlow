@@ -8,6 +8,7 @@ CREATE TABLE ai_document_chunks (
     content TEXT NOT NULL,
     embedding LONGBLOB NOT NULL,
     dimensions INT NOT NULL,
+    embedding_model VARCHAR(120) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_ai_document_chunks_resource_chunk (resource_id, chunk_index),
