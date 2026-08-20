@@ -1,9 +1,11 @@
 package com.teamproject.resource.application;
 
 import com.teamproject.common.exception.ApplicationException;
+import com.teamproject.common.storage.GroupStorageQuotaService;
 import com.teamproject.group.application.GroupAuthorization;
 import com.teamproject.group.domain.GroupMember;
-import com.teamproject.resource.application.dto.ResourceDtos.*;
+import com.teamproject.resource.application.dto.ResourceDtos.CreateLinkRequest;
+import com.teamproject.resource.application.dto.ResourceDtos.ResourceResponse;
 import com.teamproject.resource.domain.GroupResource;
 import com.teamproject.resource.domain.GroupResourceRepository;
 import com.teamproject.resource.storage.FileStorage;
@@ -30,10 +32,12 @@ public class ResourceService {
     private final TaskRepository tasks;
     private final FileStorage storage;
     private final ApplicationEventPublisher events;
+    private final GroupStorageQuotaService quota;
     public ResourceService(GroupAuthorization authorization, GroupResourceRepository resources,
-            TaskRepository tasks, FileStorage storage, ApplicationEventPublisher events) {
-        this.authorization = authorization; this.resources = resources; this.tasks = tasks; this.storage = storage;
-        this.events = events;
+            TaskRepository tasks, FileStorage storage, ApplicationEventPublisher events,
+            GroupStorageQuotaService quota) {
+        this.authorization = authorization; this.resources = resources; this.tasks = tasks;
+        this.storage = storage; this.events = events; this.quota = quota;
     }
 
     @Transactional(readOnly = true)
@@ -62,6 +66,7 @@ public class ResourceService {
         GroupMember member = authorization.requireActiveMember(groupId, userId);
         Task task = taskInGroup(taskId, groupId);
         byte[] bytes = validate(file);
+        quota.requireCapacity(userId, groupId, bytes.length);
         String checksum = sha256(bytes);
         if (resources.existsByGroupIdAndTaskIdAndChecksumSha256AndDeletedAtIsNull(groupId, taskId, checksum)) {
             throw new ApplicationException("RESOURCE_DUPLICATE", HttpStatus.CONFLICT, "같은 파일이 이미 등록되어 있습니다.");

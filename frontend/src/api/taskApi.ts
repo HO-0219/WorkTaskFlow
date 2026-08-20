@@ -8,6 +8,10 @@ export type BlockerNextActionType = 'FOLLOW_UP' | 'ESCALATE' | 'DECIDE' | 'UNBLO
 export type TaskResponse = {
   id: number;
   groupId: number;
+  projectId?: number;
+  projectName?: string;
+  projectTopicId?: number;
+  projectTopicTitle?: string;
   requesterMemberId: number;
   approverMemberId?: number;
   assigneeMemberId?: number;
@@ -65,6 +69,8 @@ export type CreateTaskRequest = {
   description?: string;
   priority: TaskPriority;
   dueAt?: string;
+  projectId?: number;
+  projectTopicId?: number;
   checklistItems?: string[];
 };
 
@@ -74,6 +80,9 @@ export type UpdateTaskRequest = {
   priority?: TaskPriority;
   dueAt?: string;
   clearDueAt?: boolean;
+  projectId?: number;
+  projectTopicId?: number;
+  clearProjectLink?: boolean;
   expectedVersion: number;
 };
 
@@ -90,6 +99,10 @@ export type TaskWeeklyObjective = {
   weekStart: string;
   objective?: WeeklyObjective;
 };
+export type AssigneeChangeRequest = { id:number; taskId:number; taskTitle:string; requestedByMemberId:number;
+  requestedByNickname:string; proposedAssigneeMemberId:number; proposedAssigneeNickname:string;
+  status:'PENDING'|'APPROVED'|'REJECTED'; reason?:string; reviewedByMemberId?:number; reviewNote?:string;
+  createdAt:string; reviewedAt?:string; version:number; };
 
 export type TransitionOptions = {
   reason?: string;
@@ -106,6 +119,10 @@ export const taskApi = {
   get: (taskId: number) => request<TaskResponse>(`/tasks/${taskId}`, {}, true),
   update: (taskId: number, body: UpdateTaskRequest) => request<TaskResponse>(`/tasks/${taskId}`, {
     method: 'PATCH', body: JSON.stringify(body),
+  }, true),
+  linkProject: (taskId:number, body:{projectId?:number;projectTopicId?:number;clearProjectLink?:boolean;expectedVersion:number}) => request<TaskResponse>(`/tasks/${taskId}/project-link`,{method:'PATCH',body:JSON.stringify(body)},true),
+  delete: (taskId: number, expectedVersion: number) => request<void>(`/tasks/${taskId}?expectedVersion=${expectedVersion}`, {
+    method: 'DELETE',
   }, true),
   transition: (
     taskId: number,
@@ -124,6 +141,9 @@ export const taskApi = {
     request<TaskResponse>(`/tasks/${taskId}/assignee/me`, {
       method: 'PUT', body: JSON.stringify({ expectedVersion }),
     }, true),
+  assigneeChangeRequests: (groupId:number) => request<AssigneeChangeRequest[]>(`/groups/${groupId}/assignee-change-requests`,{},true),
+  requestAssigneeChange: (taskId:number,assigneeMemberId:number,reason?:string) => request<AssigneeChangeRequest>(`/tasks/${taskId}/assignee-change-requests`,{method:'POST',body:JSON.stringify({assigneeMemberId,reason})},true),
+  decideAssigneeChange: (requestId:number,decision:'APPROVE'|'REJECT',expectedVersion:number,note?:string) => request<AssigneeChangeRequest>(`/task-assignee-change-requests/${requestId}/decision`,{method:'POST',body:JSON.stringify({decision,expectedVersion,note})},true),
   histories: (taskId: number) => request<TaskHistoryResponse[]>(`/tasks/${taskId}/histories`, {}, true),
   checklist: (taskId: number) => request<ChecklistResponse>(`/tasks/${taskId}/checklist-items`, {}, true),
   createChecklistItem: (taskId: number, content: string) =>

@@ -8,7 +8,7 @@ public final class NotificationDtos {
 
     public record NotificationResponse(Long id, String type, String title, String message,
             Long actorUserId, String actorNickname, Long groupId, String groupName, Long taskId, Long commentId,
-            boolean read, LocalDateTime readAt, LocalDateTime createdAt) {}
+            String targetUrl, boolean read, LocalDateTime readAt, LocalDateTime createdAt) {}
 
     public record NotificationPageResponse(List<NotificationResponse> items, Long nextCursor,
             boolean hasNext, long unreadCount) {}

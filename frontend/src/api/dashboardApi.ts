@@ -2,7 +2,7 @@ import { CalendarItem } from './calendarApi';
 import { request } from './client';
 import { NotificationResponse } from './notificationApi';
 
-export type DashboardTask = { id: number; groupId: number; groupName: string; title: string; status: string; priority: string; dueAt?: string; delayed: boolean; createdAt: string; startAt?: string; completedAt?: string; assigneeMemberId?: number; assigneeNickname?: string };
+export type DashboardTask = { id: number; groupId: number; groupName: string; title: string; projectId?: number; projectName?: string; projectTopicId?: number; projectTopicTitle?: string; status: string; priority: string; dueAt?: string; delayed: boolean; createdAt: string; startAt?: string; completedAt?: string; assigneeMemberId?: number; assigneeNickname?: string };
 export type PersonalDashboard = {
   generatedAt: string; todayDueCount: number; delayedCount: number; inProgressCount: number; unreadNotificationCount: number;
   priorityTasks: DashboardTask[];

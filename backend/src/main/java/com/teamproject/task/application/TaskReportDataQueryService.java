@@ -88,12 +88,19 @@ public class TaskReportDataQueryService implements TaskReportDataQuery {
                 Task::getId,
                 task -> new TaskReference(
                         task.getId(),
-                        task.getTitle(),
+                        contextualTitle(task),
                         task.getAssignee() == null ? null : task.getAssignee().getId(),
                         task.getAssignee() == null ? null
                                 : task.getAssignee().getUser().getNickname()),
                 (left, right) -> left,
                 LinkedHashMap::new));
+    }
+
+    private String contextualTitle(Task task) {
+        if (task.getProject() == null) return task.getTitle();
+        String context = task.getProject().getName();
+        if (task.getProjectTopic() != null) context += " · " + task.getProjectTopic().getTitle();
+        return "[" + context + "] " + task.getTitle();
     }
 
     @Override

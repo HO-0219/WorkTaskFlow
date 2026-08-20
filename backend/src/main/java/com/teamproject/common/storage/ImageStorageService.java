@@ -20,7 +20,7 @@ import java.util.UUID;
 @Service
 public class ImageStorageService {
     private static final Set<String> ALLOWED_FORMATS = Set.of("jpeg", "jpg", "png", "gif");
-    private static final Set<String> ALLOWED_CATEGORIES = Set.of("profiles", "groups");
+    private static final Set<String> ALLOWED_CATEGORIES = Set.of("profiles", "groups", "emergency-issues");
     private static final long MAX_BYTES = 5L * 1024 * 1024;
     private static final int MAX_DIMENSION = 4096;
     private final FileStorage storage;

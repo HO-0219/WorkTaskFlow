@@ -23,8 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -133,6 +132,78 @@ class TaskApiTest {
                         .content("{\"title\":\"잘못된 우선순위\",\"priority\":\"MAX\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TASK_PRIORITY_INVALID"));
+    }
+
+    @Test
+    void projectTopicTaskCanBeCompletedCorrectedAndSoftDeleted() throws Exception {
+        String token = signupAndLogin("task_project_owner", "task-project-owner@example.com");
+        long userId = users.findByUsernameIgnoreCase("task_project_owner").orElseThrow().getId();
+        long groupId = createTeam(token, "연결 업무 팀");
+        long memberId = members.findAllByUserIdAndStatusOrderByGroupTypeAscGroupNameAsc(
+                        userId, GroupMember.Status.ACTIVE).stream()
+                .filter(member -> member.getGroup().getId().equals(groupId)).findFirst().orElseThrow().getId();
+
+        var project = mvc.perform(post("/api/v1/groups/{groupId}/projects", groupId)
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"웹 개편\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        long projectId = number(project, "$.id");
+        var topic = mvc.perform(post("/api/v1/projects/{projectId}/issues", projectId)
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"level\":\"MAJOR\",\"title\":\"대시보드\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        long topicId = number(topic, "$.id");
+
+        var created = mvc.perform(post("/api/v1/groups/{groupId}/tasks", groupId)
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"프로젝트 현황 연결","projectId":%d,"projectTopicId":%d}
+                                """.formatted(projectId, topicId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.projectId").value(projectId))
+                .andExpect(jsonPath("$.projectName").value("웹 개편"))
+                .andExpect(jsonPath("$.projectTopicId").value(topicId))
+                .andExpect(jsonPath("$.projectTopicTitle").value("대시보드"))
+                .andReturn();
+        long taskId = number(created, "$.id");
+        long version = number(created, "$.version");
+
+        version = transition(token, taskId, "ACCEPT", version);
+        var assigned = mvc.perform(put("/api/v1/tasks/{taskId}/assignee", taskId)
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assigneeMemberId\":" + memberId + ",\"expectedVersion\":" + version + "}"))
+                .andExpect(status().isOk()).andReturn();
+        version = number(assigned, "$.version");
+        version = transition(token, taskId, "START", version);
+        version = transition(token, taskId, "COMPLETE", version);
+
+        var corrected = mvc.perform(patch("/api/v1/tasks/{taskId}", taskId)
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"프로젝트 현황 연결 완료\",\"expectedVersion\":" + version + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.title").value("프로젝트 현황 연결 완료"))
+                .andExpect(jsonPath("$.projectTopicId").value(topicId)).andReturn();
+        version = number(corrected, "$.version");
+
+        mvc.perform(delete("/api/v1/tasks/{taskId}", taskId)
+                        .param("expectedVersion", String.valueOf(version))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/tasks/{taskId}", taskId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    private long transition(String token, long taskId, String action, long version) throws Exception {
+        var result = mvc.perform(post("/api/v1/tasks/{taskId}/transitions", taskId)
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"" + action + "\",\"expectedVersion\":" + version + "}"))
+                .andExpect(status().isOk()).andReturn();
+        return number(result, "$.version");
+    }
+
+    private long number(org.springframework.test.web.servlet.MvcResult result, String path) throws Exception {
+        return ((Number) JsonPath.read(result.getResponse().getContentAsString(), path)).longValue();
     }
 
     private long createTeam(String token, String name) throws Exception {

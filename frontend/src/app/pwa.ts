@@ -1,3 +1,5 @@
+import { LiveUpdate, publishLiveUpdate } from './liveUpdates';
+
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
@@ -32,6 +34,10 @@ export function registerPwa() {
       reloading = true;
       window.location.reload();
     }
+  });
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type !== 'PUSH_RECEIVED') return;
+    publishLiveUpdate((event.data.data ?? {}) as LiveUpdate);
   });
 
   window.addEventListener('load', async () => {

@@ -110,6 +110,11 @@ jobs:
           MYSQL_ROOT_PASSWORD_FILE=/dev/null \
           RUNTIME_ENV_FILE=/dev/null \
             docker compose -f infra/single-ec2/compose.yml config >/dev/null
+          grep -Fq 'client_max_body_size 101m;' infra/single-ec2/nginx-app-locations.conf
+          grep -Fq 'location = /ws/chat {' infra/single-ec2/nginx-app-locations.conf
+          grep -Fq 'proxy_http_version 1.1;' infra/single-ec2/nginx-app-locations.conf
+          grep -Fq 'proxy_set_header Upgrade $http_upgrade;' infra/single-ec2/nginx-app-locations.conf
+          grep -Fq 'proxy_set_header Connection "upgrade";' infra/single-ec2/nginx-app-locations.conf
 
   container-build:
     runs-on: ubuntu-latest

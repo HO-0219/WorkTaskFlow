@@ -1,12 +1,15 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { accessToken, errorMessage } from '../../../api/client';
 import { commentApi, CommentResponse } from '../../../api/commentApi';
 import { groupApi, GroupResponse, MemberResponse } from '../../../api/groupApi';
-import { BlockerNextActionType, BlockerType, ChecklistItemResponse, ChecklistResponse, taskApi, TaskAction, TaskHistoryResponse, TaskResponse, TransitionOptions } from '../../../api/taskApi';
+import { AssigneeChangeRequest, BlockerNextActionType, BlockerType, ChecklistItemResponse, ChecklistResponse, taskApi, TaskAction, TaskHistoryResponse, TaskResponse, TransitionOptions } from '../../../api/taskApi';
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
 import { ResourcePanel } from '../../resource/ResourcePanel';
+import { subscribeToLiveUpdates } from '../../../app/liveUpdates';
+import { projectApi, ProjectResponse } from '../../../api/projectApi';
+import { ProjectIssue, projectIssueApi } from '../../../api/projectIssueApi';
 
 const statusLabels: Record<TaskResponse['status'], [string, string]> = {
   REQUESTED: ['승인 대기', 'Pending approval'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'],
@@ -32,6 +35,7 @@ export function TaskDetailPage() {
   const { t, language } = useLanguage();
   const label = (value: [string, string]) => value[language === 'ko' ? 0 : 1];
   const taskId = Number(useParams().taskId);
+  const navigate = useNavigate();
   const [task, setTask] = useState<TaskResponse>();
   const [group, setGroup] = useState<GroupResponse>();
   const [members, setMembers] = useState<MemberResponse[]>([]);
@@ -45,11 +49,17 @@ export function TaskDetailPage() {
   const [editCommentMentionIds, setEditCommentMentionIds] = useState<number[]>([]);
   const [newChecklistContent, setNewChecklistContent] = useState('');
   const [assigneeMemberId, setAssigneeMemberId] = useState('');
+  const [assigneeRequests, setAssigneeRequests] = useState<AssigneeChangeRequest[]>([]);
+  const [assigneeChangeReason, setAssigneeChangeReason] = useState('');
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editPriority, setEditPriority] = useState<TaskResponse['priority']>('NORMAL');
   const [editDueAt, setEditDueAt] = useState('');
+  const [projects, setProjects] = useState<ProjectResponse[]>([]);
+  const [topics, setTopics] = useState<ProjectIssue[]>([]);
+  const [editProjectId, setEditProjectId] = useState('');
+  const [editTopicId, setEditTopicId] = useState('');
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [reasonAction, setReasonAction] = useState<TaskAction>();
@@ -66,9 +76,9 @@ export function TaskDetailPage() {
       return;
     }
     taskApi.get(taskId).then(async (taskValue) => {
-      const [groupValue, memberValues, historyValues, checklistValue, commentValues] = await Promise.all([
+      const [groupValue, memberValues, historyValues, checklistValue, commentValues, projectValues] = await Promise.all([
         groupApi.get(taskValue.groupId), groupApi.members(taskValue.groupId), taskApi.histories(taskId),
-        taskApi.checklist(taskId), commentApi.list(taskId),
+        taskApi.checklist(taskId), commentApi.list(taskId), projectApi.list(taskValue.groupId),
       ]);
       setTask(taskValue);
       setGroup(groupValue);
@@ -76,10 +86,38 @@ export function TaskDetailPage() {
       setHistories(historyValues);
       setChecklist(checklistValue);
       setComments(commentValues);
+      setProjects(projectValues.filter((project) => project.status !== 'ARCHIVED'));
+      setAssigneeRequests(await taskApi.assigneeChangeRequests(taskValue.groupId));
       setAssigneeMemberId(taskValue.assigneeMemberId?.toString() ?? '');
       syncEditFields(taskValue);
     }).catch((caught) => setError(errorMessage(caught))).finally(() => setLoading(false));
   }, [taskId]);
+
+  useEffect(() => {
+    if (!editProjectId) { setTopics([]); setEditTopicId(''); return; }
+    projectIssueApi.list(Number(editProjectId)).then((values) => {
+      const available = values.filter((value) => value.level === 'MAJOR' && !value.archivedAt);
+      setTopics(available);
+      setEditTopicId((current) => available.some((value) => String(value.id) === current) ? current : '');
+    }).catch((caught) => setError(errorMessage(caught)));
+  }, [editProjectId]);
+
+  useEffect(() => subscribeToLiveUpdates((update) => {
+    if (update.taskId !== taskId) return;
+    Promise.all([
+      taskApi.get(taskId), taskApi.histories(taskId), taskApi.checklist(taskId), commentApi.list(taskId),
+    ]).then(([taskValue, historyValues, checklistValue, commentValues]) => {
+      setHistories(historyValues);
+      setChecklist(checklistValue);
+      setComments(commentValues);
+      // 편집 중인 본문과 optimistic-lock 버전은 유지해 다른 사용자의 변경을 덮어쓰지 않는다.
+      if (!editing) {
+        setTask(taskValue);
+        setAssigneeMemberId(taskValue.assigneeMemberId?.toString() ?? '');
+        syncEditFields(taskValue);
+      }
+    }).catch(() => undefined);
+  }), [taskId, editing]);
 
   async function transition(action: TaskAction) {
     if (!task) return;
@@ -136,6 +174,26 @@ export function TaskDetailPage() {
     }
   }
 
+  async function requestAssigneeChange() {
+    if (!task || !assigneeMemberId) return;
+    setPending(true); setError('');
+    try {
+      await taskApi.requestAssigneeChange(task.id, Number(assigneeMemberId), assigneeChangeReason.trim() || undefined);
+      setAssigneeRequests(await taskApi.assigneeChangeRequests(task.groupId)); setAssigneeChangeReason('');
+      window.dispatchEvent(new Event('notifications:refresh'));
+    } catch (caught) { setError(errorMessage(caught)); } finally { setPending(false); }
+  }
+
+  async function decideAssigneeChange(request: AssigneeChangeRequest, decision: 'APPROVE' | 'REJECT') {
+    if (!task) return; setPending(true); setError('');
+    try {
+      await taskApi.decideAssigneeChange(request.id, decision, request.version);
+      const [updated, values] = await Promise.all([taskApi.get(task.id), taskApi.assigneeChangeRequests(task.groupId)]);
+      setTask(updated); setAssigneeMemberId(updated.assigneeMemberId?.toString() ?? ''); setAssigneeRequests(values);
+      window.dispatchEvent(new Event('notifications:refresh'));
+    } catch (caught) { setError(errorMessage(caught)); } finally { setPending(false); }
+  }
+
   async function update(event: FormEvent) {
     event.preventDefault();
     if (!task) return;
@@ -148,6 +206,9 @@ export function TaskDetailPage() {
         priority: editPriority,
         dueAt: editDueAt || undefined,
         clearDueAt: !editDueAt,
+        projectId: editProjectId ? Number(editProjectId) : undefined,
+        projectTopicId: editTopicId ? Number(editTopicId) : undefined,
+        clearProjectLink: !editProjectId,
         expectedVersion: task.version,
       });
       setTask(updated);
@@ -158,6 +219,21 @@ export function TaskDetailPage() {
     } finally {
       setPending(false);
     }
+  }
+
+  async function updateProjectLink() {
+    if (!task) return; setPending(true); setError('');
+    try {
+      const updated=await taskApi.linkProject(task.id,{projectId:editProjectId?Number(editProjectId):undefined,projectTopicId:editTopicId?Number(editTopicId):undefined,clearProjectLink:!editProjectId,expectedVersion:task.version});
+      setTask(updated); syncEditFields(updated);
+    } catch(caught){setError(errorMessage(caught));} finally{setPending(false);}
+  }
+
+  async function deleteTask() {
+    if (!task || !window.confirm(t('이 완료 업무를 삭제할까요? 목록과 대시보드에서는 사라지지만 감사 이력은 보존됩니다.', 'Delete this completed task? It will disappear from lists and dashboards, while audit history is retained.'))) return;
+    setPending(true); setError('');
+    try { await taskApi.delete(task.id, task.version); navigate(`/groups/${task.groupId}/tasks`, { replace: true }); }
+    catch (caught) { setError(errorMessage(caught)); setPending(false); }
   }
 
   async function refreshChecklist() {
@@ -289,6 +365,8 @@ export function TaskDetailPage() {
     setEditDescription(value.description ?? '');
     setEditPriority(value.priority);
     setEditDueAt(value.dueAt?.slice(0, 16) ?? '');
+    setEditProjectId(value.projectId?.toString() ?? '');
+    setEditTopicId(value.projectTopicId?.toString() ?? '');
   }
 
   if (!accessToken.get()) return <Navigate to={`/login?next=${encodeURIComponent(`/tasks/${taskId}`)}`} replace />;
@@ -299,15 +377,18 @@ export function TaskDetailPage() {
     {task && <>
       <div className="task-detail-heading"><div className="task-item-top"><span className={`task-status status-${task.status.toLowerCase()}`}>{label(statusLabels[task.status])}</span><span className={`task-priority priority-${task.priority.toLowerCase()}`}>{label(priorityLabels[task.priority])}</span>{task.delayed && <span className="task-delayed">{t('지연', 'Overdue')}</span>}</div><h1>{task.title}</h1></div>
       <TaskWorkflow status={task.status} />
-      {isTerminal(task.status) && <aside className="task-record-lock"><strong>{t('지난 기록이 잠겨 있습니다.', 'Past records are locked.')}</strong><p>{t('업무 내용, 담당자와 체크리스트는 수정하거나 삭제할 수 없습니다. 완료 업무를 다시 진행해야 한다면 팀장이 사유를 남기고 재개할 수 있습니다.', 'Task details, assignees, and checklists can no longer be edited or deleted. A leader can reopen a completed task with a reason.')}</p></aside>}
+      {isTerminal(task.status) && <aside className="task-record-lock"><strong>{t('완료 기록은 보호됩니다.', 'Completion history is protected.')}</strong><p>{task.status === 'COMPLETED' ? t('제목과 설명, 프로젝트 연결은 정정할 수 있습니다. 담당자·체크리스트·상태 이력은 완료 당시 기록으로 유지됩니다.', 'You can correct task details and project links. Ownership, checklist, and status history remain as recorded at completion.') : t('반려되거나 취소된 업무는 수정할 수 없습니다.', 'Rejected or cancelled tasks cannot be edited.')}</p></aside>}
       <p className="task-description">{task.description || t('등록된 설명이 없습니다.', 'No description provided.')}</p>
+      {group?.type==='TEAM'&&['TODO','IN_PROGRESS','ON_HOLD'].includes(task.status)&&(group.role==='LEADER'||group.memberId===task.requesterMemberId||group.memberId===task.assigneeMemberId)&&<section className="task-edit-section task-link-editor"><div><strong>{t('프로젝트 연결','Project connection')}</strong><small>{t('프로젝트 밖에서 만든 업무도 진행 중에 프로젝트 또는 주제로 옮길 수 있습니다.','Move standalone work into a project or topic while it is active.')}</small></div><div className="task-project-fields"><label className="field"><span>{t('프로젝트','Project')}</span><select value={editProjectId} onChange={e=>{setEditProjectId(e.target.value);setEditTopicId('');}}><option value="">{t('프로젝트 연결 안 함','No project')}</option>{projects.map(project=><option value={project.id} key={project.id}>{project.name}</option>)}</select></label><label className="field"><span>{t('주제','Topic')}</span><select value={editTopicId} disabled={!editProjectId} onChange={e=>setEditTopicId(e.target.value)}><option value="">{t('프로젝트에만 연결','Project only')}</option>{topics.map(topic=><option value={topic.id} key={topic.id}>{topic.title}</option>)}</select></label></div><button className="secondary" type="button" disabled={pending} onClick={updateProjectLink}>{t('연결 저장','Save connection')}</button></section>}
       {canEdit(task, group) && <section className="task-edit-section">{editing ? <form className="form task-edit-form" onSubmit={update}>
+        {group?.type === 'TEAM' && <div className="task-project-fields"><label className="field"><span>{t('프로젝트', 'Project')}</span><select value={editProjectId} onChange={(event) => { setEditProjectId(event.target.value); setEditTopicId(''); }}><option value="">{t('프로젝트 연결 안 함', 'No project')}</option>{projects.map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label><label className="field"><span>{t('주제', 'Topic')}</span><select value={editTopicId} disabled={!editProjectId} onChange={(event) => setEditTopicId(event.target.value)}><option value="">{t('주제 선택 안 함', 'No topic')}</option>{topics.map((topic) => <option value={topic.id} key={topic.id}>{topic.title}</option>)}</select></label></div>}
         <label className="field"><span>{t('제목', 'Title')}</span><input required maxLength={120} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
         <label className="field"><span>{t('설명', 'Description')}</span><textarea maxLength={5000} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} /></label>
         <div className="task-edit-row"><label className="field"><span>{t('우선순위', 'Priority')}</span><select value={editPriority} onChange={(event) => setEditPriority(event.target.value as TaskResponse['priority'])}>{Object.entries(priorityLabels).map(([value, valueLabel]) => <option value={value} key={value}>{label(valueLabel)}</option>)}</select></label><label className="field"><span>{t('마감일', 'Due date')}</span><input type="datetime-local" value={editDueAt} onChange={(event) => setEditDueAt(event.target.value)} /></label></div>
         <div className="task-edit-actions"><button className="primary" disabled={pending}>{t('수정 저장', 'Save changes')}</button><button className="secondary" type="button" disabled={pending} onClick={() => { syncEditFields(task); setEditing(false); }}>{t('취소', 'Cancel')}</button></div>
       </form> : <button className="secondary" type="button" disabled={pending} onClick={() => setEditing(true)}>{t('업무 내용 수정', 'Edit task')}</button>}</section>}
       <dl className="task-metadata">
+        {task.projectName && <div><dt>{t('프로젝트', 'Project')}</dt><dd><Link to={`/projects/${task.projectId}/flow`}>{task.projectName}</Link>{task.projectTopicTitle ? ` · ${task.projectTopicTitle}` : ''}</dd></div>}
         <div><dt>{t('요청자', 'Requester')}</dt><dd>{memberName(members, task.requesterMemberId, language)}</dd></div>
         <div><dt>{t('담당자', 'Assignee')}</dt><dd>{task.assigneeMemberId ? memberName(members, task.assigneeMemberId, language) : t('미지정', 'Unassigned')}</dd></div>
         <div><dt>{t('승인자', 'Approver')}</dt><dd>{task.approverMemberId ? memberName(members, task.approverMemberId, language) : t('미지정', 'Not assigned')}</dd></div>
@@ -319,7 +400,10 @@ export function TaskDetailPage() {
         {task.stopReason && <div><dt>{t('종료 사유', 'Closure reason')}</dt><dd>{task.stopReason}</dd></div>}
       </dl>
       <div className="task-next-actions"><TaskActions task={task} group={group} pending={pending} onAction={transition} />
-        {group?.role === 'LEADER' && task.status !== 'REQUESTED' && !isTerminal(task.status) && <section className="task-action-section"><h2>{t('다음 단계 · 담당자 지정', 'Next step · Assign owner')}</h2><div className="task-assignee-form"><select value={assigneeMemberId} onChange={(event) => setAssigneeMemberId(event.target.value)}><option value="">{t('담당자 선택', 'Select assignee')}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.nickname} · {member.role === 'LEADER' ? t('팀장', 'Leader') : t('팀원', 'Member')}</option>)}</select><button className="secondary" type="button" disabled={pending || !assigneeMemberId} onClick={assign}>{t('담당자 저장', 'Save assignee')}</button></div></section>}
+        {task.status === 'COMPLETED' && (group?.type === 'PERSONAL' || group?.role === 'LEADER') && <section className="task-action-section task-delete-section"><h2>{t('완료 업무 정리', 'Completed task cleanup')}</h2><p>{t('잘못 등록된 완료 업무만 삭제하세요. 이 작업은 목록에서 숨겨집니다.', 'Delete only completed tasks created by mistake. The task will be hidden from lists.')}</p><button className="danger" type="button" disabled={pending} onClick={deleteTask}>{t('완료 업무 삭제', 'Delete completed task')}</button></section>}
+        {group?.role === 'LEADER' && !task.assigneeMemberId && task.status !== 'REQUESTED' && !isTerminal(task.status) && <section className="task-action-section"><h2>{t('다음 단계 · 첫 담당자 지정', 'Next step · Assign first owner')}</h2><div className="task-assignee-form"><select value={assigneeMemberId} onChange={(event) => setAssigneeMemberId(event.target.value)}><option value="">{t('담당자 선택', 'Select assignee')}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.nickname} · {member.role === 'LEADER' ? t('팀장', 'Leader') : t('팀원', 'Member')}</option>)}</select><button className="secondary" type="button" disabled={pending || !assigneeMemberId} onClick={assign}>{t('담당자 지정', 'Assign')}</button></div></section>}
+        {task.assigneeMemberId && task.status !== 'REQUESTED' && !isTerminal(task.status) && (group?.role === 'LEADER' || group?.memberId === task.assigneeMemberId || group?.memberId === task.requesterMemberId) && <section className="task-action-section assignee-change-section"><h2>{t('담당자 변경 요청','Request owner change')}</h2><p>{t('진행 중 담당자 변경은 팀장 승인 후 반영됩니다.','Changes apply only after leader approval.')}</p><div className="task-assignee-form"><select value={assigneeMemberId} onChange={e=>setAssigneeMemberId(e.target.value)}><option value="">{t('새 담당자 선택','Select new owner')}</option>{members.filter(member=>member.id!==task.assigneeMemberId).map(member=><option value={member.id} key={member.id}>{member.nickname}</option>)}</select><input maxLength={500} value={assigneeChangeReason} onChange={e=>setAssigneeChangeReason(e.target.value)} placeholder={t('변경 사유 (선택)','Reason (optional)')}/><button className="secondary" type="button" disabled={pending||!assigneeMemberId||Number(assigneeMemberId)===task.assigneeMemberId} onClick={requestAssigneeChange}>{t('승인 요청','Request approval')}</button></div></section>}
+        {assigneeRequests.filter(value=>value.taskId===task.id).length>0&&<section className="task-action-section assignee-request-history"><h2>{t('담당자 변경 승인 현황','Owner change approvals')}</h2>{assigneeRequests.filter(value=>value.taskId===task.id).map(value=><article key={value.id}><div><strong>{value.proposedAssigneeNickname}</strong><small>{value.requestedByNickname} · {value.status==='PENDING'?t('승인 대기','Pending'):value.status==='APPROVED'?t('승인됨','Approved'):t('반려됨','Rejected')}</small>{value.reason&&<p>{value.reason}</p>}</div>{group?.role==='LEADER'&&value.status==='PENDING'&&<div><button className="primary" type="button" disabled={pending} onClick={()=>decideAssigneeChange(value,'APPROVE')}>{t('승인','Approve')}</button><button className="secondary" type="button" disabled={pending} onClick={()=>decideAssigneeChange(value,'REJECT')}>{t('반려','Reject')}</button></div>}</article>)}</section>}
       </div>
       <ChecklistSection
         checklist={checklist}
@@ -499,10 +583,11 @@ function isTerminal(status: TaskResponse['status']) {
 }
 
 function canEdit(task: TaskResponse, group?: GroupResponse) {
-  if (!group || isTerminal(task.status)) return false;
+  if (!group || task.status === 'REJECTED' || task.status === 'CANCELLED') return false;
   if (group.type === 'PERSONAL') return true;
-  return task.status === 'REQUESTED'
-    && (group.role === 'LEADER' || task.requesterMemberId === group.memberId);
+  return (task.status === 'REQUESTED' || task.status === 'COMPLETED')
+    && (group.role === 'LEADER' || task.requesterMemberId === group.memberId
+      || task.assigneeMemberId === group.memberId);
 }
 
 function canWriteChecklist(task: TaskResponse, group?: GroupResponse) {

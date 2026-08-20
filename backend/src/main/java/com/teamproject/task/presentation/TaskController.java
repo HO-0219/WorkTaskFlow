@@ -8,6 +8,7 @@ import com.teamproject.task.application.dto.TaskDtos.TaskHistoryResponse;
 import com.teamproject.task.application.dto.TaskDtos.TaskResponse;
 import com.teamproject.task.application.dto.TaskDtos.TransitionTaskRequest;
 import com.teamproject.task.application.dto.TaskDtos.UpdateTaskRequest;
+import com.teamproject.task.application.dto.TaskDtos.LinkProjectRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -41,6 +42,19 @@ public class TaskController {
     TaskResponse update(Authentication authentication, @PathVariable Long taskId,
             @Valid @RequestBody UpdateTaskRequest request) {
         return tasks.update((Long) authentication.getPrincipal(), taskId, request);
+    }
+
+    @DeleteMapping("/tasks/{taskId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(Authentication authentication, @PathVariable Long taskId,
+            @RequestParam long expectedVersion) {
+        tasks.delete((Long) authentication.getPrincipal(), taskId, expectedVersion);
+    }
+
+    @PatchMapping("/tasks/{taskId}/project-link")
+    TaskResponse linkProject(Authentication authentication, @PathVariable Long taskId,
+            @Valid @RequestBody LinkProjectRequest request) {
+        return tasks.linkProject((Long) authentication.getPrincipal(), taskId, request);
     }
 
     @PostMapping("/tasks/{taskId}/transitions")

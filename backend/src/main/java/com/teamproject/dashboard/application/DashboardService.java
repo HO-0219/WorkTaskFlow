@@ -171,7 +171,12 @@ public class DashboardService {
     }
     private DashboardTaskResponse taskResponse(Task task) {
         return new DashboardTaskResponse(task.getId(), task.getGroup().getId(), task.getGroup().getName(),
-                task.getTitle(), task.getStatus().name(), task.getPriority().name(), task.getDueAt(), delayed(task),
+                task.getTitle(),
+                task.getProject() == null ? null : task.getProject().getId(),
+                task.getProject() == null ? null : task.getProject().getName(),
+                task.getProjectTopic() == null ? null : task.getProjectTopic().getId(),
+                task.getProjectTopic() == null ? null : task.getProjectTopic().getTitle(),
+                task.getStatus().name(), task.getPriority().name(), task.getDueAt(), delayed(task),
                 task.getCreatedAt(), task.getStartAt(), task.getCompletedAt(),
                 task.getAssignee() == null ? null : task.getAssignee().getId(),
                 task.getAssignee() == null ? null : task.getAssignee().getUser().getNickname());

@@ -1,11 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { accessToken, errorMessage } from '../../../api/client';
 import { groupApi, GroupResponse } from '../../../api/groupApi';
 import { taskApi, TaskPriority, TaskResponse } from '../../../api/taskApi';
 import { AppNavigation, Modal } from '../../../app/AppNavigation';
 import { useLanguage } from '../../../app/LanguageContext';
 import { ChecklistDraftField, cleanChecklistDraft } from '../components/ChecklistDraftField';
+import { subscribeToLiveUpdates } from '../../../app/liveUpdates';
+import { projectApi, ProjectResponse } from '../../../api/projectApi';
+import { ProjectIssue, projectIssueApi } from '../../../api/projectIssueApi';
 
 const statusLabels: Record<TaskResponse['status'], [string, string]> = {
   REQUESTED: ['승인 대기', 'Pending approval'], TODO: ['할 일', 'To do'], IN_PROGRESS: ['진행 중', 'In progress'], ON_HOLD: ['보류', 'On hold'],
@@ -19,12 +22,17 @@ export function TasksPage() {
   const { t, language } = useLanguage();
   const label = (value: [string, string]) => value[language === 'ko' ? 0 : 1];
   const groupId = Number(useParams().groupId);
+  const [searchParams] = useSearchParams();
   const [group, setGroup] = useState<GroupResponse>();
   const [tasks, setTasks] = useState<TaskResponse[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('NORMAL');
   const [dueAt, setDueAt] = useState('');
+  const [projects, setProjects] = useState<ProjectResponse[]>([]);
+  const [topics, setTopics] = useState<ProjectIssue[]>([]);
+  const [projectId, setProjectId] = useState(searchParams.get('projectId') ?? '');
+  const [topicId, setTopicId] = useState(searchParams.get('topicId') ?? '');
   const [checklistItems, setChecklistItems] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -38,11 +46,29 @@ export function TasksPage() {
       setLoading(false);
       return;
     }
-    Promise.all([groupApi.get(groupId), taskApi.list(groupId)])
-      .then(([groupValue, taskValues]) => { setGroup(groupValue); setTasks(taskValues); })
+    Promise.all([groupApi.get(groupId), taskApi.list(groupId), projectApi.list(groupId)])
+      .then(([groupValue, taskValues, projectValues]) => {
+        setGroup(groupValue); setTasks(taskValues);
+        setProjects(projectValues.filter((value) => value.status !== 'ARCHIVED'));
+        if (searchParams.get('create') === '1') setShowCreate(true);
+      })
       .catch((caught) => setError(errorMessage(caught)))
       .finally(() => setLoading(false));
   }, [groupId]);
+
+  useEffect(() => {
+    if (!projectId) { setTopics([]); setTopicId(''); return; }
+    projectIssueApi.list(Number(projectId)).then((values) => {
+      const available = values.filter((value) => value.level === 'MAJOR' && !value.archivedAt);
+      setTopics(available);
+      setTopicId((current) => available.some((value) => String(value.id) === current) ? current : '');
+    }).catch((caught) => setError(errorMessage(caught)));
+  }, [projectId]);
+
+  useEffect(() => subscribeToLiveUpdates((update) => {
+    if (update.groupId !== groupId) return;
+    taskApi.list(groupId).then(setTasks).catch(() => undefined);
+  }), [groupId]);
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -52,6 +78,8 @@ export function TasksPage() {
       const checklist = cleanChecklistDraft(checklistItems);
       const created = await taskApi.create(groupId, {
         title, description: description || undefined, priority, dueAt: dueAt || undefined,
+        projectId: projectId ? Number(projectId) : undefined,
+        projectTopicId: topicId ? Number(topicId) : undefined,
         checklistItems: checklist.length > 0 ? checklist : undefined,
       });
       setTasks((current) => [created, ...current]);
@@ -59,6 +87,7 @@ export function TasksPage() {
       setDescription('');
       setPriority('NORMAL');
       setDueAt('');
+      setProjectId(''); setTopicId('');
       setChecklistItems([]);
       setShowCreate(false);
       window.dispatchEvent(new Event('notifications:refresh'));
@@ -104,7 +133,7 @@ export function TasksPage() {
         {tasks.length === 0 && <p className="empty-state">{t('첫 업무를 등록해 보세요.', 'Create your first task.')}</p>}
         <div className="task-list">{sortedTasks.map((task) => <article className="task-item" key={task.id}>
           <Link className="task-item-main" to={`/tasks/${task.id}`}>
-            <div className="task-item-top"><span className={`task-status status-${task.status.toLowerCase()}`}>{label(statusLabels[task.status])}</span><span className={`task-priority priority-${task.priority.toLowerCase()}`}>{label(priorityLabels[task.priority])}</span>{task.delayed && <span className="task-delayed">{t('지연', 'Overdue')}</span>}</div>
+            <div className="task-item-top"><span className={`task-status status-${task.status.toLowerCase()}`}>{label(statusLabels[task.status])}</span><span className={`task-priority priority-${task.priority.toLowerCase()}`}>{label(priorityLabels[task.priority])}</span>{task.projectName && <span className="task-project-context">{task.projectName}{task.projectTopicTitle ? ` · ${task.projectTopicTitle}` : ''}</span>}{task.delayed && <span className="task-delayed">{t('지연', 'Overdue')}</span>}</div>
             <strong>{task.title}</strong>
             <p>{task.description || t('설명 없음', 'No description')}</p>
             <div className="task-date-row"><span><b>{t('등록', 'Created')}</b>{formatDate(task.createdAt, language)}</span><span className={task.delayed ? 'overdue' : ''}><b>{t('마감', 'Due')}</b>{task.dueAt ? formatDate(task.dueAt, language) : t('미정', 'Not set')}</span></div>
@@ -119,6 +148,7 @@ export function TasksPage() {
         </article>)}</div>
       </section>
       {showCreate && <Modal title={t('새 업무 만들기', 'Create a task')} description={t(`${group?.name ?? '그룹'}에 새로운 업무를 추가합니다.`, `Add a new task to ${group?.name ?? 'this group'}.`)} onClose={() => setShowCreate(false)}><form className="form modal-form" onSubmit={create}>
+        {group?.type === 'TEAM' && projects.length > 0 && <div className="task-project-fields"><label className="field"><span>{t('프로젝트', 'Project')}</span><select required value={projectId} onChange={(event) => { setProjectId(event.target.value); setTopicId(''); }}><option value="">{t('프로젝트 선택', 'Select a project')}</option>{projects.map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label><label className="field"><span>{t('주제', 'Topic')}</span><select value={topicId} disabled={!projectId} onChange={(event) => setTopicId(event.target.value)}><option value="">{topics.length > 0 ? t('주제 선택 (선택)', 'Select a topic (optional)') : t('등록된 주제 없음', 'No topics yet')}</option>{topics.map((topic) => <option value={topic.id} key={topic.id}>{topic.title}</option>)}</select></label></div>}
         <label className="field"><span>{t('제목', 'Title')}</span><input required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('예: 발표 자료 초안 작성', 'e.g. Draft presentation slides')} /></label>
         <label className="field"><span>{t('설명 (선택)', 'Description (optional)')}</span><textarea maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
         <label className="field"><span>{t('우선순위', 'Priority')}</span><select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>{Object.entries(priorityLabels).map(([value, valueLabel]) => <option value={value} key={value}>{label(valueLabel)}</option>)}</select></label>

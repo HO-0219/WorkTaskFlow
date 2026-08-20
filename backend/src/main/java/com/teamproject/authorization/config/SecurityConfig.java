@@ -54,6 +54,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/password-resets/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/oauth-signup").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/ws/chat").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler)

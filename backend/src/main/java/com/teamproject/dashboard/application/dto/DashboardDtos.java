@@ -14,9 +14,19 @@ public final class DashboardDtos {
             long completed, long rejected, long cancelled, long delayed) {}
 
     public record DashboardTaskResponse(Long id, Long groupId, String groupName, String title,
+            Long projectId, String projectName, Long projectTopicId, String projectTopicTitle,
             String status, String priority, LocalDateTime dueAt, boolean delayed,
             LocalDateTime createdAt, LocalDateTime startAt, LocalDateTime completedAt,
-            Long assigneeMemberId, String assigneeNickname) {}
+            Long assigneeMemberId, String assigneeNickname) {
+        public DashboardTaskResponse(Long id, Long groupId, String groupName, String title,
+                String status, String priority, LocalDateTime dueAt, boolean delayed,
+                LocalDateTime createdAt, LocalDateTime startAt, LocalDateTime completedAt,
+                Long assigneeMemberId, String assigneeNickname) {
+            this(id, groupId, groupName, title, null, null, null, null,
+                    status, priority, dueAt, delayed, createdAt, startAt, completedAt,
+                    assigneeMemberId, assigneeNickname);
+        }
+    }
 
     public record PersonalGroupSummary(Long groupId, String groupName, String groupType,
             long assignedCount, long completedCount, long activeCount, long delayedCount) {}

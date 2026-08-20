@@ -1,7 +1,11 @@
 package com.teamproject.migration;
 
+import com.teamproject.TeamProjectApplication;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -23,7 +27,7 @@ class MySqlFlywayMigrationTest {
                     .withPassword("worktaskflow");
 
     @Test
-    void migratesFreshMySqlSchemaFromV1ThroughV40() throws Exception {
+    void migratesFreshMySqlSchemaFromV1ThroughV46() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
@@ -31,7 +35,7 @@ class MySqlFlywayMigrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("40");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("46");
         assertThat(countSchemaObjects(
                 "information_schema.tables",
                 "table_name",
@@ -43,8 +47,18 @@ class MySqlFlywayMigrationTest {
                         "task_weekly_objective_links",
                         "ai_assistant_actions",
                         "ai_assistant_messages",
-                        "ai_document_chunks")))
-                .isEqualTo(8);
+                        "ai_document_chunks",
+                        "projects",
+                        "project_issue_nodes",
+                        "project_issue_checklist_items",
+                        "project_issue_images",
+                        "project_documents",
+                        "chat_channels",
+                        "chat_messages",
+                        "chat_socket_tickets",
+                        "task_assignee_change_requests",
+                        "emergency_issues")))
+                .isEqualTo(18);
         assertThat(countColumns(
                 "reports",
                 List.of(
@@ -60,8 +74,11 @@ class MySqlFlywayMigrationTest {
                 List.of(
                         "blocker_type",
                         "blocker_next_action_type",
-                        "blocker_review_date")))
-                .isEqualTo(3);
+                        "blocker_review_date",
+                        "project_id",
+                        "project_topic_id",
+                        "deleted_at")))
+                .isEqualTo(6);
         assertThat(countColumns(
                 "payment_attempts",
                 List.of(
@@ -75,6 +92,49 @@ class MySqlFlywayMigrationTest {
                 "group_subscriptions",
                 List.of("billing_claim_key", "billing_claimed_at")))
                 .isEqualTo(2);
+        assertThat(countColumns(
+                "projects",
+                List.of(
+                        "group_id",
+                        "lead_member_id",
+                        "created_by_member_id",
+                        "status",
+                        "start_date",
+                        "due_date",
+                        "version")))
+                .isEqualTo(7);
+        assertThat(countColumns(
+                "project_issue_nodes",
+                List.of("project_id", "parent_id", "assignee_member_id", "level", "status", "archived_at", "version")))
+                .isEqualTo(7);
+        assertThat(countColumns(
+                "project_documents",
+                List.of("project_id", "issue_node_id", "document_type", "storage_key", "size_bytes", "deleted_at")))
+                .isEqualTo(6);
+        assertThat(countColumns(
+                "chat_messages",
+                List.of("channel_id", "sender_member_id", "message_type", "storage_key", "size_bytes", "created_at")))
+                .isEqualTo(6);
+
+        // Flyway SQL이 성공하는 것만으로는 운영의 Hibernate validate 타입 불일치를 잡지 못한다.
+        // 실제 운영과 같은 MySQL 스키마 위에서 애플리케이션 컨텍스트까지 시작해 매핑을 검증한다.
+        try (ConfigurableApplicationContext ignored = new SpringApplicationBuilder(TeamProjectApplication.class)
+                .web(WebApplicationType.SERVLET)
+                .run(
+                        "--server.port=0",
+                        "--spring.datasource.url=" + MYSQL.getJdbcUrl(),
+                        "--spring.datasource.username=" + MYSQL.getUsername(),
+                        "--spring.datasource.password=" + MYSQL.getPassword(),
+                        "--spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
+                        "--spring.flyway.enabled=false",
+                        "--spring.jpa.hibernate.ddl-auto=validate",
+                        "--app.environment=test",
+                        "--app.demo.enabled=false",
+                        "--app.mail.enabled=false",
+                        "--app.ai-report.enabled=false",
+                        "--app.ai-assistant.enabled=false")) {
+            assertThat(ignored.isActive()).isTrue();
+        }
     }
 
     private long countColumns(String table, List<String> columns) throws Exception {
