@@ -80,10 +80,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "19091:19091"
     volumes:
       - ./nginx-active.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./nginx-admin-active.conf.template:/etc/nginx/templates/admin.conf.template:ro
       - ./nginx-app-locations.conf:/etc/nginx/snippets/app-locations.conf:ro
       - letsencrypt:/etc/letsencrypt:ro
       - certbot-web:/var/www/certbot:ro
