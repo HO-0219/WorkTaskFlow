@@ -19,7 +19,10 @@ export function LoginPage() {
   const [providers, setProviders] = useState<ProviderResponse>();
   useEffect(() => {
     authApi.providers().then(setProviders).catch(() => undefined);
-    if (accessToken.get()) {
+    // An admin whose MFA session hasn't been verified yet still holds a valid access token
+    // (it's just missing the MFA_VERIFIED authority). Bouncing away here would ping-pong
+    // forever with AdminPage, which redirects back to this same URL until MFA is submitted.
+    if (accessToken.get() && params.get('adminMfa') !== 'required') {
       navigate(loginDestination(next), { replace: true });
       return;
     }
@@ -30,7 +33,7 @@ export function LoginPage() {
         setPending(false);
       });
     }
-  }, [navigate, next]);
+  }, [navigate, next, params]);
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setPending(true); setError('');
