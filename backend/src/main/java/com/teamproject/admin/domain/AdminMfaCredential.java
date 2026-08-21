@@ -10,7 +10,6 @@ public class AdminMfaCredential {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @OneToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id") private User user;
     @Column(nullable = false, length = 1000) private String encryptedSecret;
-    @Column(columnDefinition = "TEXT") private String recoveryCodeHashes;
     private LocalDateTime enabledAt;
     @Column(nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(nullable = false) private LocalDateTime updatedAt;
@@ -24,14 +23,10 @@ public class AdminMfaCredential {
         if (enabledAt != null) throw new IllegalStateException("MFA is already enabled.");
         encryptedSecret = value; updatedAt = LocalDateTime.now();
     }
-    public void enable(String hashes) {
-        recoveryCodeHashes = hashes; enabledAt = LocalDateTime.now(); updatedAt = enabledAt;
-    }
-    public void consumeRecoveryCodes(String hashes) {
-        recoveryCodeHashes = hashes; updatedAt = LocalDateTime.now();
+    public void enable() {
+        enabledAt = LocalDateTime.now(); updatedAt = enabledAt;
     }
     public boolean isEnabled() { return enabledAt != null; }
     public String getEncryptedSecret() { return encryptedSecret; }
-    public String getRecoveryCodeHashes() { return recoveryCodeHashes; }
     public LocalDateTime getEnabledAt() { return enabledAt; }
 }

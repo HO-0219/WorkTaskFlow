@@ -95,6 +95,26 @@ export function AiAssistantPage() {
     }
   }
 
+  // 자료는 올린다고 바로 검색되지 않는다. 색인은 사용자가 이 버튼으로 직접 돌린다.
+  async function reindex() {
+    if (!groupId || pending) return;
+    setPending(true);
+    try {
+      const result = await assistantApi.reindex(groupId);
+      const failureNote = result.failures.length > 0
+        ? t(` 실패 ${result.failures.length}건: ${result.failures.join(', ')}.`,
+          ` Failed ${result.failures.length}: ${result.failures.join(', ')}.`)
+        : '';
+      setItems((old) => [...old, assistantMessage(t(
+        `자료 색인을 마쳤습니다. 새로 ${result.indexed}건, 그대로 ${result.skipped}건, 삭제 ${result.removed}건, 형식 미지원 ${result.unsupported}건.${failureNote}`,
+        `Indexing finished. ${result.indexed} added, ${result.skipped} unchanged, ${result.removed} removed, ${result.unsupported} unsupported.${failureNote}`))]);
+    } catch (caught) {
+      setItems((old) => [...old, assistantMessage(errorMessage(caught))]);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function copyInvite(url: string) {
     await navigator.clipboard.writeText(url);
     setItems((old) => [...old, assistantMessage(t('초대 링크를 복사했습니다.', 'Invite link copied.'))]);
@@ -114,6 +134,8 @@ export function AiAssistantPage() {
         setItems((old) => [...old, assistantMessage(t('작업 그룹을 변경했습니다.', 'Workspace changed.'))]);
       }}><option value="" disabled>{t('그룹 선택', 'Choose a group')}</option>{groups.map((group) =>
         <option value={group.id} key={group.id}>{group.name}</option>)}</select></label>
+      <button type="button" className="secondary" disabled={!groupId || pending} onClick={reindex}>
+        {t('자료 색인', 'Index documents')}</button>
     </header>
 
     {!assistantEnabled && selectedGroup && <section className="assistant-subscription-lock"><span aria-hidden="true">✦</span><div><h2>{t('AI 비서는 유료 팀 멤버십 기능입니다.', 'AI assistant is included with paid team membership.')}</h2><p>{t('그룹 결제가 승인되면 팀원 모두에게 즉시 활성화됩니다.', 'It activates for all team members immediately after payment approval.')}</p></div>{selectedGroup.role === 'LEADER' ? <Link className="primary" to={`/groups/${selectedGroup.id}?tab=plan`}>{t('멤버십 결제', 'Open membership')}</Link> : <small>{t('팀장에게 멤버십 활성화를 요청해 주세요.', 'Ask your team leader to activate the membership.')}</small>}</section>}
@@ -121,7 +143,8 @@ export function AiAssistantPage() {
       <header className="assistant-chat-heading"><div><span>✦</span><div><strong>{t('Gearvia AI', 'Gearvia AI')}</strong><small>{t(`${selectedGroup?.name ?? ''}의 업무를 바탕으로 답변합니다.`, `Answers from work in ${selectedGroup?.name ?? ''}.`)}</small></div></div><b>{t('온라인', 'Online')}</b></header>
       <div className="assistant-messages" aria-live="polite">{items.map((item) =>
         <article className={`assistant-message ${item.role}`} key={item.id}>
-          <span>{item.role === 'assistant' ? 'AI' : t('나', 'Me')}</span><p>{item.content}</p>
+          <span>{item.role === 'assistant' ? 'AI' : t('나', 'Me')}</span>
+          <p>{item.role === 'assistant' ? renderBold(item.content) : item.content}</p>
           {item.actionId && item.actionSummary && <div className="assistant-action-card">
             <strong>{item.actionSummary}</strong>
             {!item.actionResult && <div><button type="button" disabled={pending} onClick={() => decide(item, true)}>{t('확인하고 실행', 'Confirm and run')}</button>
@@ -150,6 +173,13 @@ export function AiAssistantPage() {
         <button type="submit" disabled={!message.trim() || !groupId || pending}>{t('보내기', 'Send')}</button></form>
     </section><aside className="assistant-guide-panel"><span className="assistant-guide-symbol">✦</span><h2>{t('대화가 실제 업무가 되는 방식', 'How chat becomes real work')}</h2><p>{t('AI가 임의로 바꾸지 않습니다. 현재 데이터와 내 권한을 확인한 뒤 실행 전에 한 번 더 보여줍니다.', 'AI never changes work on its own. It checks current data and your permissions, then previews every action before execution.')}</p><ol><li><b>01</b><div><strong>{t('업무 맥락 확인', 'Read context')}</strong><small>{t('선택한 그룹의 업무·댓글·알림을 확인', 'Review tasks, comments, and alerts in this group')}</small></div></li><li><b>02</b><div><strong>{t('권한 검사', 'Check permission')}</strong><small>{t('현재 계정이 할 수 있는 작업만 제안', 'Only propose actions your account can perform')}</small></div></li><li><b>03</b><div><strong>{t('확인 후 실행', 'Confirm and run')}</strong><small>{t('요약을 확인하고 승인한 작업만 반영', 'Apply only the actions you approve')}</small></div></li></ol><div className="assistant-guide-note"><b>{t('안전한 기본값', 'Safe by default')}</b><span>{t('삭제·상태 변경 같은 작업은 대화만으로 즉시 실행되지 않습니다.', 'Actions such as deletion or status changes never run from chat alone.')}</span></div></aside></div>}
   </main></>;
+}
+
+function renderBold(content: string) {
+  const parts = content.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => part.startsWith('**') && part.endsWith('**')
+    ? <strong key={index}>{part.slice(2, -2)}</strong>
+    : <span key={index}>{part}</span>);
 }
 
 function assistantMessage(content: string): ChatItem {

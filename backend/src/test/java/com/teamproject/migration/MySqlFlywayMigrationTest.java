@@ -27,7 +27,7 @@ class MySqlFlywayMigrationTest {
                     .withPassword("worktaskflow");
 
     @Test
-    void migratesFreshMySqlSchemaFromV1ThroughV45() throws Exception {
+    void migratesFreshMySqlSchemaFromV1ThroughV48() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
@@ -35,7 +35,7 @@ class MySqlFlywayMigrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("45");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("48");
         assertThat(countSchemaObjects(
                 "information_schema.tables",
                 "table_name",
@@ -47,6 +47,7 @@ class MySqlFlywayMigrationTest {
                         "task_weekly_objective_links",
                         "ai_assistant_actions",
                         "ai_assistant_messages",
+                        "ai_document_chunks",
                         "projects",
                         "project_issue_nodes",
                         "project_issue_checklist_items",
@@ -57,7 +58,7 @@ class MySqlFlywayMigrationTest {
                         "chat_socket_tickets",
                         "task_assignee_change_requests",
                         "emergency_issues")))
-                .isEqualTo(17);
+                .isEqualTo(18);
         assertThat(countColumns(
                 "reports",
                 List.of(
@@ -114,6 +115,10 @@ class MySqlFlywayMigrationTest {
                 "chat_messages",
                 List.of("channel_id", "sender_member_id", "message_type", "storage_key", "size_bytes", "created_at")))
                 .isEqualTo(6);
+        assertThat(countColumns(
+                "ai_document_chunks",
+                List.of("group_resource_id", "project_document_id")))
+                .isEqualTo(2);
 
         // Flyway SQL이 성공하는 것만으로는 운영의 Hibernate validate 타입 불일치를 잡지 못한다.
         // 실제 운영과 같은 MySQL 스키마 위에서 애플리케이션 컨텍스트까지 시작해 매핑을 검증한다.

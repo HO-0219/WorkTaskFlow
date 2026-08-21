@@ -28,7 +28,13 @@ export type AssistantMessageResponse = {
   createdAt: string;
 };
 
+export type AssistantIndexResponse = {
+  indexed: number; skipped: number; removed: number; unsupported: number; failures: string[];
+};
+
 export const assistantApi = {
+  reindex: (groupId: number) => request<AssistantIndexResponse>(
+    `/assistant/documents/reindex?groupId=${groupId}`, { method: 'POST' }, true),
   chat: (groupId: number, message: string) =>
     request<AssistantChatResponse>('/assistant/messages', {
       method: 'POST', body: JSON.stringify({ groupId, message }),

@@ -112,6 +112,10 @@ jobs:
             docker compose -f infra/single-ec2/compose.yml config >/dev/null
           grep -Fq 'client_max_body_size 101m;' infra/single-ec2/nginx-app-locations.conf
           grep -Fq 'location = /ws/chat {' infra/single-ec2/nginx-app-locations.conf
+          grep -Fq 'location = /admin { return 404; }' infra/single-ec2/nginx-app-locations.conf
+          grep -Fq 'listen 19091;' infra/single-ec2/nginx-admin-http.conf.template
+          grep -Fq 'listen 19091 ssl;' infra/single-ec2/nginx-admin-https.conf.template
+          grep -Fq 'proxy_pass http://${BACKEND_ADMIN};' infra/single-ec2/nginx-admin-https.conf.template
           grep -Fq 'proxy_http_version 1.1;' infra/single-ec2/nginx-app-locations.conf
           grep -Fq 'proxy_set_header Upgrade $http_upgrade;' infra/single-ec2/nginx-app-locations.conf
           grep -Fq 'proxy_set_header Connection "upgrade";' infra/single-ec2/nginx-app-locations.conf

@@ -48,7 +48,6 @@ public class AiAssistantContextService {
         var member = authorization.requireActiveMember(groupId, userId);
         var group = member.getGroup();
         var context = new LinkedHashMap<String, Object>();
-        context.put("now", LocalDateTime.now().toString());
         context.put("group", new GroupContext(group.getId(), group.getName(), group.getType().name(),
                 group.getTimezone(), member.getRole().name()));
         var workspaces = members.findAllByUserIdAndStatusOrderByGroupTypeAscGroupNameAsc(
@@ -81,6 +80,9 @@ public class AiAssistantContextService {
             context.put("latestWeeklyReport", new ReportContext(report.getPeriodFrom(),
                     report.getPeriodToExclusive(), analysis.substring(0, Math.min(analysis.length(), 6000))));
         });
+        // 프롬프트 캐시는 앞부분이 그대로여야 재사용된다. now는 호출마다 바뀌므로 맨 뒤에 둬서
+        // group·workspaces·tasks·members·report 블록까지는 같은 대화 안에서 캐시가 살아남게 한다.
+        context.put("now", LocalDateTime.now().toString());
         try {
             return new Context(group, objectMapper.writeValueAsString(context),
                     workspaces.stream().map(value -> value.getGroup().getId()).collect(Collectors.toSet()),
