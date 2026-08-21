@@ -3,6 +3,7 @@ package com.teamproject.assistant.application;
 import com.teamproject.assistant.application.AiDocumentChunkStore.Candidate;
 import com.teamproject.assistant.application.dto.AiAssistantDtos.IndexResponse;
 import com.teamproject.assistant.application.port.EmbeddingGateway;
+import com.teamproject.assistant.domain.AiDocumentSource;
 import com.teamproject.group.application.GroupAuthorization;
 import com.teamproject.resource.storage.FileStorage;
 import java.util.ArrayList;
@@ -14,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * 그룹 자료 증분 색인.
+ * 그룹 자료·프로젝트 파일 증분 색인.
  *
  * <p>자료는 한 번 올리면 내용이 바뀌지 않는다(수정 API 가 없다). 그래서 자료 ID 만으로 색인
  * 여부를 판단한다. 목록에서 사라진 자료는 삭제된 것이므로 색인에서도 지운다. 같은 그룹에 몇 번을
@@ -22,6 +23,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>임베딩 호출은 트랜잭션 밖에서 한다. 메타데이터를 짧은 트랜잭션으로 읽고, 파일 읽기와 외부
  * 호출을 마친 뒤, 저장만 다시 짧은 트랜잭션으로 처리한다({@link AiDocumentChunkStore}).
+ *
+ * <p>그룹 자료실({@link AiDocumentSource#GROUP_RESOURCE})과 프로젝트 파일
+ * ({@link AiDocumentSource#PROJECT_DOCUMENT})은 별개 저장소라 두 출처를 각각 훑는다.
  */
 @Service
 public class AiDocumentIndexService {
@@ -57,47 +61,48 @@ public class AiDocumentIndexService {
      */
     public IndexResponse reindexGroup(Long groupId) {
         String modelId = embeddings.modelId();
-        List<Candidate> candidates = store.candidates(groupId);
+        Result total = new Result();
+        for (AiDocumentSource source : AiDocumentSource.values()) {
+            reindexSource(source, groupId, modelId, total);
+        }
+        return new IndexResponse(total.added, total.skipped, total.removed, total.unsupported, total.failures);
+    }
+
+    private void reindexSource(AiDocumentSource source, Long groupId, String modelId, Result total) {
+        List<Candidate> candidates = store.candidates(source, groupId);
         // 모델이 바뀌기 전 자료를 지웠는지 판단하려면 모델과 무관하게 "색인된 적 있음"이 필요하다.
-        Set<Long> everIndexed = store.allIndexedResourceIds(groupId);
+        Set<Long> everIndexed = store.allIndexedResourceIds(source, groupId);
         // 재색인을 건너뛸지는 지금 모델로 색인됐는지로만 판단한다 — 옛 모델로 남은 자료는 다시 잡는다.
-        Set<Long> upToDate = store.upToDateResourceIds(groupId, modelId);
+        Set<Long> upToDate = store.upToDateResourceIds(source, groupId, modelId);
         Set<Long> live = new HashSet<>();
         candidates.forEach(candidate -> live.add(candidate.resourceId()));
 
-        int added = 0;
-        int skipped = 0;
-        int removed = 0;
-        int unsupported = 0;
-        List<String> failures = new ArrayList<>();
-
         for (Long stale : everIndexed) {
             if (!live.contains(stale)) {
-                store.deleteResource(stale);
-                removed++;
+                store.deleteResource(source, stale);
+                total.removed++;
             }
         }
         for (Candidate candidate : candidates) {
             if (upToDate.contains(candidate.resourceId())) {
-                skipped++;
+                total.skipped++;
                 continue;
             }
             if (candidate.storageKey() == null) {
                 // 외부 링크는 본문을 가져오지 않는다. 제목만으로는 색인 가치가 없다.
-                skipped++;
+                total.skipped++;
                 continue;
             }
             if (!extractor.supports(candidate.filename())) {
-                unsupported++;
+                total.unsupported++;
                 continue;
             }
-            switch (tryIndex(groupId, candidate, modelId)) {
-                case ADDED -> added++;
-                case UNSUPPORTED -> unsupported++;
-                case FAILED -> failures.add(candidate.title());
+            switch (tryIndex(source, groupId, candidate, modelId)) {
+                case ADDED -> total.added++;
+                case UNSUPPORTED -> total.unsupported++;
+                case FAILED -> total.failures.add(candidate.title());
             }
         }
-        return new IndexResponse(added, skipped, removed, unsupported, failures);
     }
 
     /**
@@ -105,16 +110,16 @@ public class AiDocumentIndexService {
      * 사용자가 누르는 재색인 버튼과 달리 업무 결과를 UI 에 보고하지 않는 조용한 경로라, 이미 색인된
      * 자료거나 지원하지 않는 형식이면 그냥 건너뛴다.
      */
-    public void indexResource(Long groupId, Long resourceId) {
-        if (store.isIndexed(resourceId)) return;
-        Candidate candidate = store.candidate(groupId, resourceId).orElse(null);
+    public void indexResource(AiDocumentSource source, Long groupId, Long resourceId) {
+        if (store.isIndexed(source, resourceId)) return;
+        Candidate candidate = store.candidate(source, groupId, resourceId).orElse(null);
         if (candidate == null || candidate.storageKey() == null || !extractor.supports(candidate.filename())) {
             return;
         }
-        tryIndex(groupId, candidate, embeddings.modelId());
+        tryIndex(source, groupId, candidate, embeddings.modelId());
     }
 
-    private Outcome tryIndex(Long groupId, Candidate candidate, String modelId) {
+    private Outcome tryIndex(AiDocumentSource source, Long groupId, Candidate candidate, String modelId) {
         List<String> pieces;
         try {
             byte[] content = storage.get(candidate.storageKey()).content();
@@ -126,7 +131,7 @@ public class AiDocumentIndexService {
         }
         if (pieces.isEmpty()) return Outcome.UNSUPPORTED;
         try {
-            store.save(groupId, candidate, pieces, embeddings.embed(pieces), modelId);
+            store.save(source, groupId, candidate, pieces, embeddings.embed(pieces), modelId);
             return Outcome.ADDED;
         } catch (RuntimeException exception) {
             log.warn("자료 {} 색인 실패: {}", candidate.resourceId(), exception.getClass().getSimpleName());
@@ -135,4 +140,9 @@ public class AiDocumentIndexService {
     }
 
     private enum Outcome { ADDED, UNSUPPORTED, FAILED }
+
+    private static final class Result {
+        int added; int skipped; int removed; int unsupported;
+        final List<String> failures = new ArrayList<>();
+    }
 }

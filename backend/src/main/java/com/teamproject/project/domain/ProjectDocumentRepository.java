@@ -13,4 +13,11 @@ public interface ProjectDocumentRepository extends JpaRepository<ProjectDocument
     boolean existsByProjectIdAndIssueNodeIsNullAndChecksumSha256AndDeletedAtIsNull(Long projectId, String checksum);
     @Query("select coalesce(sum(d.sizeBytes), 0) from ProjectDocument d where d.project.group.id = :groupId and d.deletedAt is null and d.sizeBytes is not null")
     long sumActiveFileBytesByGroupId(@Param("groupId") Long groupId);
+
+    @Query("select d from ProjectDocument d where d.project.group.id = :groupId and d.deletedAt is null"
+            + " order by d.createdAt desc, d.id desc")
+    List<ProjectDocument> findAllByGroupIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(@Param("groupId") Long groupId);
+
+    @Query("select d from ProjectDocument d where d.id = :id and d.project.group.id = :groupId and d.deletedAt is null")
+    Optional<ProjectDocument> findByIdAndGroupIdAndDeletedAtIsNull(@Param("id") Long id, @Param("groupId") Long groupId);
 }

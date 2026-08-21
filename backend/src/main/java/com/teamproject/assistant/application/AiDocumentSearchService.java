@@ -60,7 +60,7 @@ public class AiDocumentSearchService {
      * Pageable 로 걸어서, DB 에서 그룹 전체를 다 읽어온 뒤에 자르는 일이 없게 한다.
      */
     private List<Scored> scored(Long groupId) {
-        List<AiDocumentChunk> stored = chunks.findByGroupIdAndResourceDeletedAtIsNullOrderByIdDesc(groupId,
+        List<AiDocumentChunk> stored = chunks.findLiveByGroupIdOrderByIdDesc(groupId,
                 PageRequest.of(0, MAX_SCANNED_CHUNKS));
         return stored.stream()
                 .map(chunk -> new Scored(chunk.getTitle(), chunk.getFilename(), chunk.getContent(),
