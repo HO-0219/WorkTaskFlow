@@ -1,0 +1,10 @@
+# The admin listener requires TLS. Before the first certificate is issued there is nothing
+# safe to serve here yet, so this stub just refuses the connection instead of referencing a
+# certificate file that does not exist (which would crash nginx on first boot). The deploy
+# script swaps this out for nginx-admin-https.conf.template once a certificate exists, the
+# same way it swaps nginx-http.conf.template for nginx-https.conf.template on the main site.
+server {
+    listen 19091;
+    server_name _;
+    return 421;
+}
