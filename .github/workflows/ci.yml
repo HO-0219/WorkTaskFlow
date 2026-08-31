@@ -27,7 +27,7 @@ jobs:
           tracked_forbidden="$(
             git ls-files \
               | grep -E "$forbidden_pattern" \
-              | grep -v -E '^(\.env\.example|README\.md|GITHUB_ACTIONS_SECRETS_SETUP\.txt)$' \
+              | grep -v -E '^(\.env\.example|README\.md|infra/GITHUB_ACTIONS_SECRETS_SETUP\.md)$' \
               || true
           )"
           if [[ -n "$tracked_forbidden" ]]; then
